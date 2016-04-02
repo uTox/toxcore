@@ -33,6 +33,8 @@
 /* TODO: this must depend on other variable. */
 #define MAX_STATUSMESSAGE_LENGTH 1007
 
+/* TODO: this shouldn't be 16*/
+#define MAX_DEVICE_COUNT 16
 
 #define FRIEND_ADDRESS_SIZE (crypto_box_PUBLICKEYBYTES + sizeof(uint32_t) + sizeof(uint16_t))
 
@@ -44,6 +46,11 @@ enum {
 /* NOTE: Packet ids below 24 must never be used. */
 #define PACKET_ID_ONLINE 24
 #define PACKET_ID_OFFLINE 25
+
+#define PACKET_ID_DEVICE_QUERY      30
+#define PACKET_ID_DEVICE_RESPONSE   31
+#define PACKET_ID_DEVICE_CHANGE     35
+
 #define PACKET_ID_NICKNAME 48
 #define PACKET_ID_STATUSMESSAGE 49
 #define PACKET_ID_USERSTATUS 50
@@ -87,6 +94,17 @@ enum {
     FRIEND_REQUESTED,
     FRIEND_CONFIRMED,
     FRIEND_ONLINE,
+};
+
+enum {
+    NO_DEVICE,
+    /* Device is active */
+    DEVICE_PENDING,
+    DEVICE_CONFIRMED,
+    DEVICE_ONLINE,
+    /* Device is blocked */
+    DEVICE_BLOCKED,
+    DEVICE_REFUSED,
 };
 
 /* Errors for m_addfriend
@@ -171,8 +189,16 @@ enum {
 typedef struct Messenger Messenger;
 
 typedef struct {
+    uint8_t status; //0 no device, 1-3 device confimed, 4-5 device is blocked
     uint8_t real_pk[crypto_box_PUBLICKEYBYTES];
     int friendcon_id;
+
+    uint64_t last_seen_time;
+    uint8_t last_connection_udp_tcp;
+} Friend_Device;
+
+typedef struct {
+    Friend_Device device[MAX_DEVICE_COUNT];
 
     uint64_t friendrequest_lastsent; // Time at which the last friend request was sent.
     uint32_t friendrequest_timeout; // The timeout between successful friendrequest sending attempts.
@@ -233,7 +259,7 @@ struct Messenger {
     Friend *friendlist;
     uint32_t numfriends;
 
-#define NUM_SAVED_TCP_RELAYS 8
+    #define NUM_SAVED_TCP_RELAYS 8
     uint8_t has_added_relays; // If the first connection has occurred in do_messenger
     Node_format loaded_relays[NUM_SAVED_TCP_RELAYS]; // Relays loaded from config
 

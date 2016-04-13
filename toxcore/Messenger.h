@@ -98,13 +98,13 @@ enum {
 
 enum {
     NO_DEVICE,
+    /* Device is blocked */
+    DEVICE_BLOCKED,
+    DEVICE_REFUSED,
     /* Device is active */
     DEVICE_PENDING,
     DEVICE_CONFIRMED,
     DEVICE_ONLINE,
-    /* Device is blocked */
-    DEVICE_BLOCKED,
-    DEVICE_REFUSED,
 };
 
 /* Errors for m_addfriend
@@ -191,7 +191,6 @@ typedef struct Messenger Messenger;
 typedef struct {
     uint8_t  status; //0 no device, 1-3 device confimed, 4-5 device is blocked
     uint8_t  real_pk[crypto_box_PUBLICKEYBYTES];
-    uint32_t nospam; // The nospam number used in the friend request.
 
     int friendcon_id;
 

@@ -160,7 +160,7 @@ static int send_online_packet(Messenger *m, int32_t friendnumber, int32_t device
     uint8_t packet = PACKET_ID_ONLINE;
     return write_cryptpacket(m->net_crypto,
                              friend_connection_crypt_connection_id(m->fr_c,
-                                                                   m->friendlist[friendnumber].device[device_num].friendcon_id),
+                                                m->friendlist[friendnumber].device[device_num].friendcon_id),
                              &packet,
                              sizeof(packet),
                              0) != -1;
@@ -476,6 +476,7 @@ static int add_receipt(Messenger *m, int32_t friendnumber, uint32_t packet_num, 
     new->next = NULL;
     return 0;
 }
+
 /*
  * return -1 on failure.
  * return 0 if packet was received.
@@ -596,39 +597,60 @@ int m_friend_exists(const Messenger *m, int32_t friendnumber)
  * return -5 if bad type.
  * return 0 if success.
  */
-int m_send_message_generic(Messenger *m, int32_t friendnumber, uint8_t type, const uint8_t *message, uint32_t length,
+int m_send_message_generic(Messenger *m, int32_t fr_num, uint8_t type, const uint8_t *message, uint32_t length,
                            uint32_t *message_id)
 {
-    if (type > MESSAGE_ACTION)
+    if (type > MESSAGE_ACTION) {
         return -5;
+    }
 
-    if (friend_not_valid(m, friendnumber))
+    if (friend_not_valid(m, fr_num)) {
         return -1;
+    }
 
-    if (length >= MAX_CRYPTO_DATA_SIZE)
+    if (length >= MAX_CRYPTO_DATA_SIZE) {
         return -2;
+    }
 
-    if (m->friendlist[friendnumber].status != FRIEND_ONLINE)
+    if (m->friendlist[fr_num].status != FRIEND_ONLINE) {
         return -3;
+    }
 
     uint8_t packet[length + 1];
     packet[0] = type + PACKET_ID_MESSAGE;
 
-    if (length != 0)
+    if (length != 0) {
         memcpy(packet + 1, message, length);
+    }
 
-    int64_t packet_num = write_cryptpacket(m->net_crypto, friend_connection_crypt_connection_id(m->fr_c,
-                                           m->friendlist[friendnumber].device[0].friendcon_id), packet, length + 1, 0);
+    uint8_t dev;
+    int64_t packet_num = -1;
 
-    if (packet_num == -1)
+    for (dev = 0; dev < MAX_DEVICE_COUNT; dev++) {
+        if (m->friendlist[fr_num].device[dev].status == DEVICE_ONLINE) {
+            int crypt_con_id = friend_connection_crypt_connection_id(m->fr_c,
+                                                                     m->friendlist[fr_num].device[dev].friendcon_id);
+            int64_t this_packet_num = write_cryptpacket(m->net_crypto, crypt_con_id, packet, length + 1, 0);
+
+            if (this_packet_num == -1 && packet_num != -1) {
+                continue;
+            } else {
+                packet_num = this_packet_num;
+            }
+        }
+    }
+
+    if (packet_num == -1) {
         return -4;
+    }
 
-    uint32_t msg_id = ++m->friendlist[friendnumber].message_id;
+    uint32_t msg_id = ++m->friendlist[fr_num].message_id;
 
-    add_receipt(m, friendnumber, packet_num, msg_id);
+    add_receipt(m, fr_num, packet_num, msg_id);
 
-    if (message_id)
+    if (message_id) {
         *message_id = msg_id;
+    }
 
     return 0;
 }
@@ -1021,12 +1043,13 @@ static void check_friend_connectionstatus(Messenger *m, int32_t friendnumber, ui
 
         m->friendlist[friendnumber].status = status;
 
-        check_friend_tcp_udp(m, friendnumber);
 
         if (m->friend_connectionstatuschange_internal)
             m->friend_connectionstatuschange_internal(m, friendnumber, is_online,
                     m->friend_connectionstatuschange_internal_userdata);
     }
+
+    check_friend_tcp_udp(m, friendnumber);
 }
 
 void set_friend_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status)
@@ -2059,6 +2082,7 @@ static int handle_status(void *object, int i, int device_id, uint8_t status)
     Messenger *m = object;
 
     if (status) { /* Went online. */
+        set_friend_status(m, i, device_id, FRIEND_ONLINE);
         send_online_packet(m, i, device_id);
     } else { /* Went offline. */
         if (m->friendlist[i].status == FRIEND_ONLINE) {
@@ -2079,16 +2103,15 @@ static int handle_packet(void *object, int i, int device_id, uint8_t *temp, uint
     uint8_t *data = temp + 1;
     uint32_t data_length = len - 1;
 
-    if (m->friendlist[i].status != FRIEND_ONLINE) {
-        if (packet_id == PACKET_ID_ONLINE && len == 1) {
+    switch (packet_id) {
+        case PACKET_ID_ONLINE: {
+            if (len != 1) {
+                return -1;
+            }
             set_friend_status(m, i, device_id, FRIEND_ONLINE);
             send_online_packet(m, i, device_id);
-        } else {
-            return -1;
+            break;
         }
-    }
-
-    switch (packet_id) {
         case PACKET_ID_OFFLINE: {
             if (data_length != 0)
                 break;
@@ -2706,7 +2729,6 @@ static int friends_list_load(Messenger *m, const uint8_t *data, uint32_t length)
             for (device = 1; device < MAX_DEVICE_COUNT; ++device) {
                 if (temp.device_status && public_key_valid(temp.real_pk[device])) {
                     m_add_device_to_friend_confirmed(m, temp.real_pk[device], fnum);
-                    printf("adding device to friend %i at %2u && %2x \n", fnum, device, temp.real_pk[device]);
                 }
             }
         } else if (temp.status != 0) {

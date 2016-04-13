@@ -79,17 +79,20 @@ typedef struct {
     uint64_t share_relays_lastsent;
 
     struct {
-        int (*status_callback)(void *object, int id, uint8_t status);
+        int (*status_callback)(void *object, int id, int device_id, uint8_t status);
         void *status_callback_object;
         int status_callback_id;
+        int status_callback_device;
 
-        int (*data_callback)(void *object, int id, uint8_t *data, uint16_t length);
+        int (*data_callback)(void *object, int id, int device_id, uint8_t *data, uint16_t length);
         void *data_callback_object;
         int data_callback_id;
+        int data_callback_device;
 
-        int (*lossy_data_callback)(void *object, int id, const uint8_t *data, uint16_t length);
+        int (*lossy_data_callback)(void *object, int id, int device_id, const uint8_t *data, uint16_t length);
         void *lossy_data_callback_object;
         int lossy_data_callback_id;
+        int lossy_data_callback_device;
     } callbacks[MAX_FRIEND_CONNECTION_CALLBACKS];
 
     uint16_t lock_count;
@@ -157,10 +160,15 @@ int friend_add_tcp_relay(Friend_Connections *fr_c, int friendcon_id, IP_Port ip_
  * return 0 on success.
  * return -1 on failure
  */
-int friend_connection_callbacks(Friend_Connections *fr_c, int friendcon_id, unsigned int index,
-                                int (*status_callback)(void *object, int id, uint8_t status), int (*data_callback)(void *object, int id, uint8_t *data,
-                                        uint16_t length), int (*lossy_data_callback)(void *object, int id, const uint8_t *data, uint16_t length), void *object,
-                                int number);
+int friend_connection_callbacks(Friend_Connections *fr_c,
+                                int friendcon_id,
+                                unsigned int index,
+                                int (*status_callback)(void *object, int id, int device_id, uint8_t status),
+                                int (*data_callback)(void *object, int id, int device_id, uint8_t *data, uint16_t length),
+                                int (*lossy_data_callback)(void *object, int id, int device_id, const uint8_t *data, uint16_t length),
+                                void *object,
+                                int friend_number,
+                                int device_number);
 
 /* return the crypt_connection_id for the connection.
  *

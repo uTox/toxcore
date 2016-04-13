@@ -577,6 +577,25 @@ uint32_t tox_friend_add(Tox *tox, const uint8_t *address, const uint8_t *message
     return UINT32_MAX;
 }
 
+uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend_number, TOX_ERR_FRIEND_ADD *error)
+{
+    if (!address) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_NULL);
+        return UINT32_MAX;
+    }
+
+    Messenger *m = tox;
+    int32_t ret = m_add_device_to_friend(m, address, friend_number);
+
+    if (ret >= 0) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_OK);
+        return ret;
+    }
+
+    set_friend_error(ret, error);
+    return UINT32_MAX;
+}
+
 uint32_t tox_friend_add_norequest(Tox *tox, const uint8_t *public_key, TOX_ERR_FRIEND_ADD *error)
 {
     if (!public_key) {

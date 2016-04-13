@@ -338,9 +338,12 @@ static int handle_status(void *object, int number, uint8_t status)
         unsigned int i;
 
         for (i = 0; i < MAX_FRIEND_CONNECTION_CALLBACKS; ++i) {
-            if (friend_con->callbacks[i].status_callback)
+            if (friend_con->callbacks[i].status_callback) {
                 friend_con->callbacks[i].status_callback(friend_con->callbacks[i].status_callback_object,
-                        friend_con->callbacks[i].status_callback_id, status);
+                                                         friend_con->callbacks[i].status_callback_id,
+                                                         friend_con->callbacks[i].status_callback_device,
+                                                         status);
+            }
         }
     }
 
@@ -410,9 +413,13 @@ static int handle_packet(void *object, int number, uint8_t *data, uint16_t lengt
     unsigned int i;
 
     for (i = 0; i < MAX_FRIEND_CONNECTION_CALLBACKS; ++i) {
-        if (friend_con->callbacks[i].data_callback)
+        if (friend_con->callbacks[i].data_callback) {
             friend_con->callbacks[i].data_callback(friend_con->callbacks[i].data_callback_object,
-                                                   friend_con->callbacks[i].data_callback_id, data, length);
+                                                   friend_con->callbacks[i].data_callback_id,
+                                                   friend_con->callbacks[i].data_callback_device,
+                                                   data,
+                                                   length);
+        }
 
         friend_con = get_conn(fr_c, number);
 
@@ -437,9 +444,13 @@ static int handle_lossy_packet(void *object, int number, const uint8_t *data, ui
     unsigned int i;
 
     for (i = 0; i < MAX_FRIEND_CONNECTION_CALLBACKS; ++i) {
-        if (friend_con->callbacks[i].lossy_data_callback)
+        if (friend_con->callbacks[i].lossy_data_callback) {
             friend_con->callbacks[i].lossy_data_callback(friend_con->callbacks[i].lossy_data_callback_object,
-                    friend_con->callbacks[i].lossy_data_callback_id, data, length);
+                                                         friend_con->callbacks[i].lossy_data_callback_id,
+                                                         friend_con->callbacks[i].lossy_data_callback_device,
+                                                         data,
+                                                         length);
+        }
 
         friend_con = get_conn(fr_c, number);
 
@@ -602,10 +613,15 @@ void set_dht_temp_pk(Friend_Connections *fr_c, int friendcon_id, const uint8_t *
  * return 0 on success.
  * return -1 on failure
  */
-int friend_connection_callbacks(Friend_Connections *fr_c, int friendcon_id, unsigned int index,
-                                int (*status_callback)(void *object, int id, uint8_t status), int (*data_callback)(void *object, int id, uint8_t *data,
-                                        uint16_t length), int (*lossy_data_callback)(void *object, int id, const uint8_t *data, uint16_t length), void *object,
-                                int number)
+int friend_connection_callbacks(Friend_Connections *fr_c,
+                                int friendcon_id,
+                                unsigned int index,
+                                int (*status_callback)(void *object, int id, int device_id, uint8_t status),
+                                int (*data_callback)(void *object, int id, int device_id, uint8_t *data, uint16_t length),
+                                int (*lossy_data_callback)(void *object, int id, int device_id, const uint8_t *data, uint16_t length),
+                                void *object,
+                                int friend_number,
+                                int device_number)
 {
     Friend_Conn *friend_con = get_conn(fr_c, friendcon_id);
 
@@ -625,7 +641,11 @@ int friend_connection_callbacks(Friend_Connections *fr_c, int friendcon_id, unsi
 
     friend_con->callbacks[index].status_callback_id =
         friend_con->callbacks[index].data_callback_id =
-            friend_con->callbacks[index].lossy_data_callback_id = number;
+            friend_con->callbacks[index].lossy_data_callback_id = friend_number;
+
+    friend_con->callbacks[index].status_callback_device =
+        friend_con->callbacks[index].data_callback_device =
+            friend_con->callbacks[index].lossy_data_callback_device = device_number;
     return 0;
 }
 

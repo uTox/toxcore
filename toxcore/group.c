@@ -598,7 +598,7 @@ static void set_conns_status_groups(Group_Chats *g_c, int friendcon_id, uint8_t 
     }
 }
 
-static int handle_status(void *object, int friendcon_id, uint8_t status)
+static int handle_status(void *object, int friendcon_id, int device_id, uint8_t status)
 {
     Group_Chats *g_c = object;
 
@@ -612,8 +612,8 @@ static int handle_status(void *object, int friendcon_id, uint8_t status)
     return 0;
 }
 
-static int handle_packet(void *object, int friendcon_id, uint8_t *data, uint16_t length);
-static int handle_lossy(void *object, int friendcon_id, const uint8_t *data, uint16_t length);
+static int handle_packet(void *object, int friendcon_id, int device_id, uint8_t *data, uint16_t length);
+static int handle_lossy(void *object, int friendcon_id, int device_id, const uint8_t *data, uint16_t length);
 
 /* Add friend to group chat.
  *
@@ -652,7 +652,7 @@ static int add_conn_to_groupchat(Group_Chats *g_c, int friendcon_id, int groupnu
     g->close[ind].closest = closest;
     //TODO
     friend_connection_callbacks(g_c->m->fr_c, friendcon_id, GROUPCHAT_CALLBACK_INDEX, &handle_status, &handle_packet,
-                                &handle_lossy, g_c, friendcon_id);
+                                &handle_lossy, g_c, friendcon_id, 0);
 
     return ind;
 }
@@ -1930,7 +1930,7 @@ static void handle_message_packet_group(Group_Chats *g_c, int groupnumber, const
     send_message_all_close(g_c, groupnumber, data, length, -1/*TODO close_index*/);
 }
 
-static int handle_packet(void *object, int friendcon_id, uint8_t *data, uint16_t length)
+static int handle_packet(void *object, int friendcon_id, int device_id, uint8_t *data, uint16_t length)
 {
     Group_Chats *g_c = object;
 
@@ -2035,7 +2035,7 @@ static unsigned int lossy_packet_not_received(Group_c *g, int peer_index, uint16
     return -1;
 }
 
-static int handle_lossy(void *object, int friendcon_id, const uint8_t *data, uint16_t length)
+static int handle_lossy(void *object, int friendcon_id, int device_id, const uint8_t *data, uint16_t length)
 {
     Group_Chats *g_c = object;
 

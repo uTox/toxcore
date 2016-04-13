@@ -189,8 +189,10 @@ enum {
 typedef struct Messenger Messenger;
 
 typedef struct {
-    uint8_t status; //0 no device, 1-3 device confimed, 4-5 device is blocked
-    uint8_t real_pk[crypto_box_PUBLICKEYBYTES];
+    uint8_t  status; //0 no device, 1-3 device confimed, 4-5 device is blocked
+    uint8_t  real_pk[crypto_box_PUBLICKEYBYTES];
+    uint32_t nospam; // The nospam number used in the friend request.
+
     int friendcon_id;
 
     uint64_t last_seen_time;

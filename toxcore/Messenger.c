@@ -82,7 +82,7 @@ int32_t getfriend_id(const Messenger *m, const uint8_t *real_pk)
 
     for (i = 0; i < m->numfriends; ++i) {
         if (m->friendlist[i].status > 0) {
-            for(device = 0; i < MAX_DEVICE_COUNT; ++device) {
+            for(device = 0; device < MAX_DEVICE_COUNT; ++device) {
                 if (id_equal(real_pk, m->friendlist[i].device[device].real_pk)) {
                     return i;
                 }
@@ -151,7 +151,7 @@ void getaddress(const Messenger *m, uint8_t *address)
     memcpy(address + crypto_box_PUBLICKEYBYTES + sizeof(nospam), &checksum, sizeof(checksum));
 }
 
-static int send_online_packet(Messenger *m, int32_t friendnumber)
+static int send_online_packet(Messenger *m, int32_t friendnumber, int32_t device_num)
 {
     if (friend_not_valid(m, friendnumber)) {
         return 0;
@@ -160,7 +160,7 @@ static int send_online_packet(Messenger *m, int32_t friendnumber)
     uint8_t packet = PACKET_ID_ONLINE;
     return write_cryptpacket(m->net_crypto,
                              friend_connection_crypt_connection_id(m->fr_c,
-                                                                   m->friendlist[friendnumber].device[0].friendcon_id),
+                                                                   m->friendlist[friendnumber].device[device_num].friendcon_id),
                              &packet,
                              sizeof(packet),
                              0) != -1;
@@ -176,9 +176,9 @@ static int send_offline_packet(Messenger *m, int friendcon_id)
                              sizeof(packet), 0) != -1;
 }
 
-static int handle_status(void *object, int i, uint8_t status);
-static int handle_packet(void *object, int i, uint8_t *temp, uint16_t len);
-static int handle_custom_lossy_packet(void *object, int friend_num, const uint8_t *packet, uint16_t length);
+static int handle_status(void *object, int i, int device_id, uint8_t status);
+static int handle_packet(void *object, int i, int device_id, uint8_t *temp, uint16_t len);
+static int handle_custom_lossy_packet(void *object, int friend_num, int device_id, const uint8_t *packet, uint16_t length);
 
 static int32_t init_new_friend(Messenger *m, const uint8_t *real_pk, uint8_t status)
 {
@@ -212,13 +212,14 @@ static int32_t init_new_friend(Messenger *m, const uint8_t *real_pk, uint8_t sta
                                         &handle_packet,
                                         &handle_custom_lossy_packet,
                                         m,
-                                        i);
+                                        i,  /* friend number */
+                                        0); /* device number always 0 for new friend */
 
             if (m->numfriends == i)
                 ++m->numfriends;
 
             if (friend_con_connected(m->fr_c, friendcon_id) == FRIENDCONN_STATUS_CONNECTED) {
-                send_online_packet(m, i);
+                send_online_packet(m, i, 0);
             }
 
             return i;
@@ -228,6 +229,42 @@ static int32_t init_new_friend(Messenger *m, const uint8_t *real_pk, uint8_t sta
     return FAERR_NOMEM;
 }
 
+static int32_t init_new_device(Messenger *m, uint32_t friend_number, const uint8_t *real_pk)
+{
+    /* Resize the friend list if necessary. */
+    int friendcon_id = new_friend_connection(m->fr_c, real_pk);
+
+    if (friendcon_id == -1) {
+        return FAERR_NOMEM;
+    }
+
+    if (m->friendlist[friend_number].status >= FRIEND_CONFIRMED) {
+        uint8_t i;
+        for(i = 0; i < MAX_DEVICE_COUNT; ++i) {
+            if(m->friendlist[friend_number].device[i].status == NO_DEVICE) {
+                m->friendlist[friend_number].device[i].friendcon_id = friendcon_id;
+                id_copy(m->friendlist[friend_number].device[i].real_pk, real_pk);
+                friend_connection_callbacks(m->fr_c,
+                                            friendcon_id,
+                                            MESSENGER_CALLBACK_INDEX,
+                                            &handle_status,
+                                            &handle_packet,
+                                            &handle_custom_lossy_packet,
+                                            m,
+                                            friend_number,
+                                            i);
+
+                if (friend_con_connected(m->fr_c, friendcon_id) == FRIENDCONN_STATUS_CONNECTED) {
+                    send_online_packet(m, friend_number, i);
+                }
+                printf("added new device to %i, at %i\n", friend_number, i);
+                return i;
+            }
+        }
+    }
+
+    return FAERR_NOMEM;
+}
 
 /*
  * Add a friend.
@@ -294,6 +331,59 @@ int32_t m_addfriend(Messenger *m, const uint8_t *address, const uint8_t *data, u
     memcpy(m->friendlist[ret].info, data, length);
     m->friendlist[ret].info_size = length;
     memcpy(&(m->friendlist[ret].friendrequest_nospam), address + crypto_box_PUBLICKEYBYTES, sizeof(uint32_t));
+
+    return ret;
+}
+
+/*
+ * TODO: document this fxn
+ *
+ *
+ *
+ *
+ */
+int32_t m_add_device_to_friend(Messenger *m, const uint8_t *address, uint32_t friend_number)
+{
+    uint8_t real_pk[crypto_box_PUBLICKEYBYTES];
+    id_copy(real_pk, address);
+
+    if (!public_key_valid(real_pk)) {
+        return FAERR_BADCHECKSUM;
+    }
+
+    uint16_t check, checksum = address_checksum(address, FRIEND_ADDRESS_SIZE - sizeof(checksum));
+    memcpy(&check, address + crypto_box_PUBLICKEYBYTES + sizeof(uint32_t), sizeof(check));
+
+    if (check != checksum) {
+        return FAERR_BADCHECKSUM;
+    }
+
+    if (id_equal(real_pk, m->net_crypto->self_public_key)) {
+        return FAERR_OWNKEY;
+    }
+
+    int32_t friend_id = getfriend_id(m, real_pk);
+
+    if (friend_id != -1) {
+        if (m->friendlist[friend_id].status >= FRIEND_CONFIRMED) {
+            printf("already added this ID\n");
+            return FAERR_ALREADYSENT;
+        }
+
+        uint32_t nospam;
+        memcpy(&nospam, address + crypto_box_PUBLICKEYBYTES, sizeof(nospam));
+
+        if (m->friendlist[friend_id].friendrequest_nospam == nospam) {
+            return FAERR_ALREADYSENT;
+        }
+
+        m->friendlist[friend_id].friendrequest_nospam = nospam;
+        return FAERR_SETNEWNOSPAM;
+    }
+
+    int32_t ret = init_new_device(m, friend_number, real_pk);
+
+    memcpy(&(m->friendlist[friend_number].device[ret].nospam), address + crypto_box_PUBLICKEYBYTES, sizeof(uint32_t));
 
     return ret;
 }
@@ -408,7 +498,7 @@ int m_delfriend(Messenger *m, int32_t friendnumber)
 
     clear_receipts(m, friendnumber);
     remove_request_received(&(m->fr), m->friendlist[friendnumber].device[0].real_pk);
-    friend_connection_callbacks(m->fr_c, m->friendlist[friendnumber].device[0].friendcon_id, MESSENGER_CALLBACK_INDEX, 0, 0, 0, 0, 0);
+    friend_connection_callbacks(m->fr_c, m->friendlist[friendnumber].device[0].friendcon_id, MESSENGER_CALLBACK_INDEX, 0, 0, 0, 0, 0, 0);
 
     if (friend_con_connected(m->fr_c, m->friendlist[friendnumber].device[0].friendcon_id) == FRIENDCONN_STATUS_CONNECTED) {
         send_offline_packet(m, m->friendlist[friendnumber].device[0].friendcon_id);
@@ -1634,7 +1724,7 @@ int m_msi_packet(const Messenger *m, int32_t friendnumber, const uint8_t *data, 
     return write_cryptpacket_id(m, friendnumber, PACKET_ID_MSI, data, length, 0);
 }
 
-static int handle_custom_lossy_packet(void *object, int friend_num, const uint8_t *packet, uint16_t length)
+static int handle_custom_lossy_packet(void *object, int friend_num, int device_id, const uint8_t *packet, uint16_t length)
 {
     Messenger *m = object;
 
@@ -1707,7 +1797,7 @@ int send_custom_lossy_packet(const Messenger *m, int32_t friendnumber, const uin
     }
 }
 
-static int handle_custom_lossless_packet(void *object, int friend_num, const uint8_t *packet, uint16_t length)
+static int handle_custom_lossless_packet(void *object, int friend_num, int device_id, const uint8_t *packet, uint16_t length)
 {
     Messenger *m = object;
 
@@ -1912,12 +2002,12 @@ static void check_friend_request_timed_out(Messenger *m, uint32_t i, uint64_t t)
     }
 }
 
-static int handle_status(void *object, int i, uint8_t status)
+static int handle_status(void *object, int i, int device_id, uint8_t status)
 {
     Messenger *m = object;
 
     if (status) { /* Went online. */
-        send_online_packet(m, i);
+        send_online_packet(m, i, device_id);
     } else { /* Went offline. */
         if (m->friendlist[i].status == FRIEND_ONLINE) {
             set_friend_status(m, i, FRIEND_CONFIRMED);
@@ -1927,7 +2017,7 @@ static int handle_status(void *object, int i, uint8_t status)
     return 0;
 }
 
-static int handle_packet(void *object, int i, uint8_t *temp, uint16_t len)
+static int handle_packet(void *object, int i, int device_id, uint8_t *temp, uint16_t len)
 {
     if (len == 0)
         return -1;
@@ -1940,7 +2030,7 @@ static int handle_packet(void *object, int i, uint8_t *temp, uint16_t len)
     if (m->friendlist[i].status != FRIEND_ONLINE) {
         if (packet_id == PACKET_ID_ONLINE && len == 1) {
             set_friend_status(m, i, FRIEND_ONLINE);
-            send_online_packet(m, i);
+            send_online_packet(m, i, device_id);
         } else {
             return -1;
         }
@@ -2189,7 +2279,7 @@ static int handle_packet(void *object, int i, uint8_t *temp, uint16_t len)
         }
 
         default: {
-            handle_custom_lossless_packet(object, i, temp, len);
+            handle_custom_lossless_packet(object, i, device_id, temp, len);
             break;
         }
     }
@@ -2213,6 +2303,16 @@ void do_friends(Messenger *m)
                 set_friend_status(m, i, FRIEND_REQUESTED);
                 m->friendlist[i].friendrequest_lastsent = temp_time;
             }
+        } else {
+            uint32_t d;
+            for (d = 0; d < MAX_DEVICE_COUNT; d++) {
+                if (m->friendlist[i].device[d].status == DEVICE_PENDING) {
+                    int fr = send_friend_request_packet(m->fr_c, m->friendlist[i].device[d].friendcon_id,
+                                                        m->friendlist[i].device[d].nospam,
+                                                        NULL, 0);
+                }
+            }
+
         }
 
         if (m->friendlist[i].status == FRIEND_REQUESTED
@@ -2465,7 +2565,7 @@ void do_messenger(Messenger *m)
 #define NUM_SAVED_PATH_NODES 8
 struct SAVED_FRIEND {
     uint8_t status;
-    uint8_t device_status;
+    uint8_t device_status[MAX_DEVICE_COUNT];
     uint8_t real_pk[MAX_DEVICE_COUNT][crypto_box_PUBLICKEYBYTES];
     uint8_t info[SAVED_FRIEND_REQUEST_SIZE]; // the data that is sent during the friend requests we do.
     uint16_t info_size; // Length of the info.
@@ -2495,7 +2595,7 @@ static uint32_t friends_list_save(const Messenger *m, uint8_t *data)
             temp.status = m->friendlist[i].status;
             for(device = 0; device < MAX_DEVICE_COUNT; ++device) {
                 memcpy(temp.real_pk[device], m->friendlist[i].device[device].real_pk, crypto_box_PUBLICKEYBYTES);
-                temp.device_status = m->friendlist[i].device[device].status;
+                temp.device_status[device] = m->friendlist[i].device[device].status;
             }
 
             if (temp.status < 3) {
@@ -2544,8 +2644,9 @@ static int friends_list_load(Messenger *m, const uint8_t *data, uint32_t length)
         if (temp.status >= 3) {
             int fnum = m_addfriend_norequest(m, temp.real_pk[0]);
 
-            if (fnum < 0)
+            if (fnum < 0) {
                 continue;
+            }
 
             setfriendname(m, fnum, temp.name, ntohs(temp.name_length));
             set_friend_statusmessage(m, fnum, temp.statusmessage, ntohs(temp.statusmessage_length));
@@ -2554,10 +2655,18 @@ static int friends_list_load(Messenger *m, const uint8_t *data, uint32_t length)
             memcpy(last_seen_time, &temp.last_seen_time, sizeof(uint64_t));
             net_to_host(last_seen_time, sizeof(uint64_t));
             memcpy(&m->friendlist[fnum].last_seen_time, last_seen_time, sizeof(uint64_t));
+
+            for (device = 1; device < MAX_DEVICE_COUNT; ++device) {
+                if (public_key_valid(temp.real_pk[device])) {
+                    m_add_device_to_friend(m, temp.real_pk[device], fnum);
+                    printf("adding device to friend %i && %2x\n", fnum, temp.real_pk[device]);
+                }
+            }
         } else if (temp.status != 0) {
             /* TODO: This is not a good way to do this. */
+            /* TODO: Do we want to add devices for unconfirmed friends? */
             uint8_t address[FRIEND_ADDRESS_SIZE];
-            id_copy(address, temp.real_pk[0]); /* whelp... fuck me */
+            id_copy(address, temp.real_pk[0]);
             memcpy(address + crypto_box_PUBLICKEYBYTES, &(temp.friendrequest_nospam), sizeof(uint32_t));
             uint16_t checksum = address_checksum(address, FRIEND_ADDRESS_SIZE - sizeof(checksum));
             memcpy(address + crypto_box_PUBLICKEYBYTES + sizeof(uint32_t), &checksum, sizeof(checksum));

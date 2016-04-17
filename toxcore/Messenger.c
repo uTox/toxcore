@@ -36,7 +36,8 @@
 #include "util.h"
 
 
-static void set_friend_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status);
+static void set_friend_status(Messenger *m, int32_t friendnumber, uint8_t status);
+static void set_device_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status);
 static int write_cryptpacket_id(const Messenger *m, int32_t friendnumber, uint8_t packet_id, const uint8_t *data,
                                 uint32_t length, uint8_t congestion_control);
 
@@ -1022,7 +1023,7 @@ static void check_friend_tcp_udp(Messenger *m, int32_t friendnumber)
 }
 
 static void break_files(const Messenger *m, int32_t friendnumber);
-static void check_friend_connectionstatus(Messenger *m, int32_t friendnumber, uint8_t status)
+static void update_friend_connectionstatus(Messenger *m, int32_t friendnumber, uint8_t status)
 {
     if (status == NOFRIEND)
         return;
@@ -1052,27 +1053,36 @@ static void check_friend_connectionstatus(Messenger *m, int32_t friendnumber, ui
     check_friend_tcp_udp(m, friendnumber);
 }
 
-void set_friend_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status)
+void set_friend_status(Messenger *m, int32_t friendnumber, uint8_t status)
 {
-    check_friend_connectionstatus(m, friendnumber, status);
+    update_friend_connectionstatus(m, friendnumber, status);
     m->friendlist[friendnumber].status = status;
     switch (status) {
         case FRIEND_ADDED:
         case FRIEND_REQUESTED: {
-            m->friendlist[friendnumber].device[device_id].status = DEVICE_PENDING;
+            m->friendlist[friendnumber].device[0].status = DEVICE_PENDING;
             break;
         }
 
         case FRIEND_CONFIRMED: {
-            m->friendlist[friendnumber].device[device_id].status = DEVICE_CONFIRMED;
+            m->friendlist[friendnumber].device[0].status = DEVICE_CONFIRMED;
             break;
         }
 
         case FRIEND_ONLINE: {
-            m->friendlist[friendnumber].device[device_id].status = DEVICE_ONLINE;
+            m->friendlist[friendnumber].device[0].status = DEVICE_ONLINE;
             break;
         }
+    }
+}
 
+void set_device_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status)
+{
+    m->friendlist[friendnumber].device[device_id].status = status;
+
+    if (status == DEVICE_CONFIRMED) {
+
+    } else if (status == DEVICE_ONLINE) {
 
     }
 }
@@ -2069,7 +2079,7 @@ static void check_friend_request_timed_out(Messenger *m, uint32_t i, uint64_t t)
     Friend *f = &m->friendlist[i];
 
     if (f->friendrequest_lastsent + f->friendrequest_timeout < t) {
-        set_friend_status(m, i, 0, FRIEND_ADDED); /* Friend request are always device 0 */
+        set_friend_status(m, i, FRIEND_ADDED);
         /* Double the default timeout every time if friendrequest is assumed
          * to have been sent unsuccessfully.
          */
@@ -2082,11 +2092,11 @@ static int handle_status(void *object, int i, int device_id, uint8_t status)
     Messenger *m = object;
 
     if (status) { /* Went online. */
-        set_friend_status(m, i, device_id, FRIEND_ONLINE);
+        set_device_status(m, i, device_id, DEVICE_ONLINE);
         send_online_packet(m, i, device_id);
     } else { /* Went offline. */
         if (m->friendlist[i].status == FRIEND_ONLINE) {
-            set_friend_status(m, i, device_id, FRIEND_CONFIRMED);
+            set_device_status(m, i, device_id, DEVICE_CONFIRMED);
         }
     }
 
@@ -2103,12 +2113,22 @@ static int handle_packet(void *object, int i, int device_id, uint8_t *temp, uint
     uint8_t *data = temp + 1;
     uint32_t data_length = len - 1;
 
+    if (m->friendlist[i].status != FRIEND_ONLINE) {
+        if (packet_id == PACKET_ID_ONLINE && len == 1) {
+            set_friend_status(m, i, FRIEND_ONLINE);
+            set_device_status(m, i, device_id, DEVICE_ONLINE);
+            send_online_packet(m, i);
+        } else {
+            return -1;
+        }
+    }
+
     switch (packet_id) {
         case PACKET_ID_ONLINE: {
             if (len != 1) {
                 return -1;
             }
-            set_friend_status(m, i, device_id, FRIEND_ONLINE);
+            set_device_status(m, i, device_id, DEVICE_ONLINE);
             send_online_packet(m, i, device_id);
             break;
         }
@@ -2116,7 +2136,7 @@ static int handle_packet(void *object, int i, int device_id, uint8_t *temp, uint
             if (data_length != 0)
                 break;
 
-            set_friend_status(m, i, device_id, FRIEND_CONFIRMED);
+            set_device_status(m, i, device_id, DEVICE_CONFIRMED);
             break;
         }
 
@@ -2375,7 +2395,7 @@ void do_friends(Messenger *m)
                                                 m->friendlist[i].info_size);
 
             if (fr >= 0) {
-                set_friend_status(m, i, 0, FRIEND_REQUESTED); /* Friend requests are assumed to be device 0 */
+                set_friend_status(m, i, FRIEND_REQUESTED);
                 m->friendlist[i].friendrequest_lastsent = temp_time;
             }
         }

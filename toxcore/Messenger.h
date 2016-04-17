@@ -200,6 +200,8 @@ typedef struct {
 
 typedef struct {
     Friend_Device device[MAX_DEVICE_COUNT];
+    uint64_t      device_count;
+    uint64_t      device_online_count;
 
     uint64_t friendrequest_lastsent; // Time at which the last friend request was sent.
     uint32_t friendrequest_timeout; // The timeout between successful friendrequest sending attempts.

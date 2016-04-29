@@ -155,6 +155,7 @@ struct File_Transfers {
     unsigned int slots_allocated; /* number of slots allocated to this transfer. */
     uint8_t id[FILE_ID_LENGTH];
 };
+
 enum {
     FILESTATUS_NONE,
     FILESTATUS_NOT_ACCEPTED,
@@ -170,7 +171,8 @@ enum {
     FILE_PAUSE_BOTH
 };
 
-/* This cannot be bigger than 256 */
+/* This cannot be bigger than 256
+ *    -- Why not? */
 #define MAX_CONCURRENT_FILE_PIPES 256
 
 enum {
@@ -203,22 +205,32 @@ typedef struct {
     uint64_t      device_count;
     uint64_t      device_online_count;
 
+    uint8_t  user_device_count_sent;
+
     uint64_t friendrequest_lastsent; // Time at which the last friend request was sent.
     uint32_t friendrequest_timeout; // The timeout between successful friendrequest sending attempts.
+
     uint8_t status; // 0 if no friend, 1 if added, 2 if friend request sent, 3 if confirmed friend, 4 if online.
+
     uint8_t info[MAX_FRIEND_REQUEST_DATA_SIZE]; // the data that is sent during the friend requests we do.
+
     uint8_t name[MAX_NAME_LENGTH];
     uint16_t name_length;
     uint8_t name_sent; // 0 if we didn't send our name to this friend 1 if we have.
+
     uint8_t statusmessage[MAX_STATUSMESSAGE_LENGTH];
     uint16_t statusmessage_length;
     uint8_t statusmessage_sent;
+
     USERSTATUS userstatus;
     uint8_t userstatus_sent;
+
     uint8_t user_istyping;
     uint8_t user_istyping_sent;
     uint8_t is_typing;
+
     uint16_t info_size; // Length of the info.
+
     uint32_t message_id; // a semi-unique id used in read receipts.
     uint32_t friendrequest_nospam; // The nospam number used in the friend request.
     uint64_t last_seen_time;

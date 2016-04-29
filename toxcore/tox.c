@@ -417,6 +417,26 @@ void tox_self_get_address(const Tox *tox, uint8_t *address)
     }
 }
 
+bool tox_self_add_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_ADD *error)
+{
+    return 0;
+}
+
+uint32_t tox_self_get_device_count(const Tox *tox)
+{
+    return 0;
+}
+
+bool tox_self_get_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_GET *error)
+{
+    return 0;
+}
+
+bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *error)
+{
+    return 0;
+}
+
 void tox_self_set_nospam(Tox *tox, uint32_t nospam)
 {
     Messenger *m = tox;

@@ -2116,7 +2116,7 @@ static int handle_packet(void *object, int i, int device_id, uint8_t *temp, uint
         if (packet_id == PACKET_ID_ONLINE && len == 1) {
             set_friend_status(m, i, FRIEND_ONLINE);
             set_device_status(m, i, device_id, DEVICE_ONLINE);
-            send_online_packet(m, i);
+            send_online_packet(m, i, device_id);
         } else {
             return -1;
         }

@@ -33,6 +33,8 @@
 /* TODO: this must depend on other variable. */
 #define MAX_STATUSMESSAGE_LENGTH 1007
 
+/* TODO: this shouldn't be 16*/
+#define MAX_DEVICE_COUNT 16
 
 #define FRIEND_ADDRESS_SIZE (crypto_box_PUBLICKEYBYTES + sizeof(uint32_t) + sizeof(uint16_t))
 
@@ -44,6 +46,11 @@ enum {
 /* NOTE: Packet ids below 24 must never be used. */
 #define PACKET_ID_ONLINE 24
 #define PACKET_ID_OFFLINE 25
+
+#define PACKET_ID_DEVICE_QUERY      30
+#define PACKET_ID_DEVICE_RESPONSE   31
+#define PACKET_ID_DEVICE_CHANGE     35
+
 #define PACKET_ID_NICKNAME 48
 #define PACKET_ID_STATUSMESSAGE 49
 #define PACKET_ID_USERSTATUS 50
@@ -87,6 +94,17 @@ enum {
     FRIEND_REQUESTED,
     FRIEND_CONFIRMED,
     FRIEND_ONLINE,
+};
+
+enum {
+    NO_DEVICE,
+    /* Device is blocked */
+    DEVICE_BLOCKED,
+    DEVICE_REFUSED,
+    /* Device is active */
+    DEVICE_PENDING,
+    DEVICE_CONFIRMED,
+    DEVICE_ONLINE,
 };
 
 /* Errors for m_addfriend
@@ -137,6 +155,7 @@ struct File_Transfers {
     unsigned int slots_allocated; /* number of slots allocated to this transfer. */
     uint8_t id[FILE_ID_LENGTH];
 };
+
 enum {
     FILESTATUS_NONE,
     FILESTATUS_NOT_ACCEPTED,
@@ -152,7 +171,8 @@ enum {
     FILE_PAUSE_BOTH
 };
 
-/* This cannot be bigger than 256 */
+/* This cannot be bigger than 256
+ *    -- Why not? */
 #define MAX_CONCURRENT_FILE_PIPES 256
 
 enum {
@@ -171,25 +191,46 @@ enum {
 typedef struct Messenger Messenger;
 
 typedef struct {
-    uint8_t real_pk[crypto_box_PUBLICKEYBYTES];
+    uint8_t  status; //0 no device, 1-3 device confimed, 4-5 device is blocked
+    uint8_t  real_pk[crypto_box_PUBLICKEYBYTES];
+
     int friendcon_id;
+
+    uint64_t last_seen_time;
+    uint8_t last_connection_udp_tcp;
+} Friend_Device;
+
+typedef struct {
+    Friend_Device device[MAX_DEVICE_COUNT];
+    uint64_t      device_count;
+    uint64_t      device_online_count;
+
+    uint8_t  user_device_count_sent;
 
     uint64_t friendrequest_lastsent; // Time at which the last friend request was sent.
     uint32_t friendrequest_timeout; // The timeout between successful friendrequest sending attempts.
+
     uint8_t status; // 0 if no friend, 1 if added, 2 if friend request sent, 3 if confirmed friend, 4 if online.
+
     uint8_t info[MAX_FRIEND_REQUEST_DATA_SIZE]; // the data that is sent during the friend requests we do.
+
     uint8_t name[MAX_NAME_LENGTH];
     uint16_t name_length;
     uint8_t name_sent; // 0 if we didn't send our name to this friend 1 if we have.
+
     uint8_t statusmessage[MAX_STATUSMESSAGE_LENGTH];
     uint16_t statusmessage_length;
     uint8_t statusmessage_sent;
+
     USERSTATUS userstatus;
     uint8_t userstatus_sent;
+
     uint8_t user_istyping;
     uint8_t user_istyping_sent;
     uint8_t is_typing;
+
     uint16_t info_size; // Length of the info.
+
     uint32_t message_id; // a semi-unique id used in read receipts.
     uint32_t friendrequest_nospam; // The nospam number used in the friend request.
     uint64_t last_seen_time;
@@ -233,7 +274,7 @@ struct Messenger {
     Friend *friendlist;
     uint32_t numfriends;
 
-#define NUM_SAVED_TCP_RELAYS 8
+    #define NUM_SAVED_TCP_RELAYS 8
     uint8_t has_added_relays; // If the first connection has occurred in do_messenger
     Node_format loaded_relays[NUM_SAVED_TCP_RELAYS]; // Relays loaded from config
 
@@ -368,7 +409,7 @@ int m_friend_exists(const Messenger *m, int32_t friendnumber);
  *
  *  the value in message_id will be passed to your read_receipt callback when the other receives the message.
  */
-int m_send_message_generic(Messenger *m, int32_t friendnumber, uint8_t type, const uint8_t *message, uint32_t length,
+int m_send_message_generic(Messenger *m, int32_t fr_num, uint8_t type, const uint8_t *message, uint32_t length,
                            uint32_t *message_id);
 
 

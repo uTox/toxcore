@@ -417,6 +417,26 @@ void tox_self_get_address(const Tox *tox, uint8_t *address)
     }
 }
 
+bool tox_self_add_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_ADD *error)
+{
+    return 0;
+}
+
+uint32_t tox_self_get_device_count(const Tox *tox)
+{
+    return 0;
+}
+
+bool tox_self_get_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_GET *error)
+{
+    return 0;
+}
+
+bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *error)
+{
+    return 0;
+}
+
 void tox_self_set_nospam(Tox *tox, uint32_t nospam)
 {
     Messenger *m = tox;
@@ -567,6 +587,25 @@ uint32_t tox_friend_add(Tox *tox, const uint8_t *address, const uint8_t *message
 
     Messenger *m = tox;
     int32_t ret = m_addfriend(m, address, message, length);
+
+    if (ret >= 0) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_OK);
+        return ret;
+    }
+
+    set_friend_error(ret, error);
+    return UINT32_MAX;
+}
+
+uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend_number, TOX_ERR_FRIEND_ADD *error)
+{
+    if (!address) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_NULL);
+        return UINT32_MAX;
+    }
+
+    Messenger *m = tox;
+    int32_t ret = m_add_device_to_friend(m, address, friend_number);
 
     if (ret >= 0) {
         SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_OK);

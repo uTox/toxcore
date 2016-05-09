@@ -79,17 +79,20 @@ typedef struct {
     uint64_t share_relays_lastsent;
 
     struct {
-        int (*status_callback)(void *object, int id, uint8_t status);
+        int (*status_callback)(void *object, int friend_id, int device_id, uint8_t status);
         void *status_callback_object;
-        int status_callback_id;
+        int status_callback_friend_id;
+        int status_callback_device_id;
 
-        int (*data_callback)(void *object, int id, uint8_t *data, uint16_t length);
+        int (*data_callback)(void *object, int friend_id, int device_id, uint8_t *data, uint16_t length);
         void *data_callback_object;
-        int data_callback_id;
+        int data_callback_friend_id;
+        int data_callback_device_id;
 
-        int (*lossy_data_callback)(void *object, int id, const uint8_t *data, uint16_t length);
+        int (*lossy_data_callback)(void *object, int friend_id, int device_id, const uint8_t *data, uint16_t length);
         void *lossy_data_callback_object;
-        int lossy_data_callback_id;
+        int lossy_data_callback_friend_id;
+        int lossy_data_callback_device_id;
     } callbacks[MAX_TOX_CONNECTION_CALLBACKS];
 
     uint16_t lock_count;
@@ -158,10 +161,10 @@ int toxconn_add_tcp_relay(Tox_Connections *tox_conns, int toxconn_id, IP_Port ip
  * return -1 on failure
  */
 int toxconn_set_callbacks(Tox_Connections *tox_conns, int toxconn_id, unsigned int index,
-                          int (*status_callback)(void *object, int id, uint8_t status),
-                          int (*data_callback)(void *object, int id, uint8_t *data, uint16_t length),
-                          int (*lossy_data_callback)(void *object, int id, const uint8_t *data, uint16_t length),
-                          void *object, int number);
+        int (*status_callback)(void *object, int friend_num, int device_id, uint8_t status),
+        int (*data_callback)(void *object, int friend_num, int device_id, uint8_t *data, uint16_t length),
+        int (*lossy_data_callback)(void *object, int friend_num, int device_id, const uint8_t *data, uint16_t length),
+        void *object, int friend_number, int device_number);
 
 /* return the crypt_connection_id for the connection.
  *
@@ -191,7 +194,7 @@ int kill_tox_conn(Tox_Connections *tox_conns, int toxconn_id);
  *  return  0 if it sent the connection request was received directly.
  *  return the number of peers it was routed through if it did not send it directly.
  */
-int send_tox_conn_request_pkt(Tox_Connections *tox_conns, int toxconn_id, uint32_t nospam_num, const uint8_t *data,
+int send_toxconn_request_pkt(Tox_Connections *tox_conns, int toxconn_id, uint32_t nospam_num, const uint8_t *data,
                                uint16_t length);
 
 /* Set connection request callback.

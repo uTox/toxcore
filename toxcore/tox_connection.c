@@ -340,7 +340,9 @@ static int handle_status(void *object, int number, uint8_t status)
         for (i = 0; i < MAX_TOX_CONNECTION_CALLBACKS; ++i) {
             if (tox_con->callbacks[i].status_callback)
                 tox_con->callbacks[i].status_callback(tox_con->callbacks[i].status_callback_object,
-                        tox_con->callbacks[i].status_callback_id, status);
+                                                      tox_con->callbacks[i].status_callback_friend_id,
+                                                      tox_con->callbacks[i].status_callback_device_id,
+                                                      status);
         }
     }
 
@@ -412,7 +414,9 @@ static int handle_packet(void *object, int number, uint8_t *data, uint16_t lengt
     for (i = 0; i < MAX_TOX_CONNECTION_CALLBACKS; ++i) {
         if (tox_con->callbacks[i].data_callback)
             tox_con->callbacks[i].data_callback(tox_con->callbacks[i].data_callback_object,
-                                                   tox_con->callbacks[i].data_callback_id, data, length);
+                                                tox_con->callbacks[i].data_callback_friend_id,
+                                                tox_con->callbacks[i].data_callback_device_id,
+                                                data, length);
 
         tox_con = get_conn(tox_conns, number);
 
@@ -439,7 +443,9 @@ static int handle_lossy_packet(void *object, int number, const uint8_t *data, ui
     for (i = 0; i < MAX_TOX_CONNECTION_CALLBACKS; ++i) {
         if (tox_con->callbacks[i].lossy_data_callback)
             tox_con->callbacks[i].lossy_data_callback(tox_con->callbacks[i].lossy_data_callback_object,
-                    tox_con->callbacks[i].lossy_data_callback_id, data, length);
+                                                      tox_con->callbacks[i].lossy_data_callback_friend_id,
+                                                      tox_con->callbacks[i].lossy_data_callback_device_id,
+                                                      data, length);
 
         tox_con = get_conn(tox_conns, number);
 
@@ -602,10 +608,10 @@ void set_dht_temp_pk(Tox_Connections *tox_conns, int toxconn_id, const uint8_t *
  * return -1 on failure
  */
 int toxconn_set_callbacks(Tox_Connections *tox_conns, int toxconn_id, unsigned int index,
-                          int (*status_callback)(void *object, int id, uint8_t status),
-                          int (*data_callback)(void *object, int id, uint8_t *data, uint16_t length),
-                          int (*lossy_data_callback)(void *object, int id, const uint8_t *data, uint16_t length),
-                          void *object, int number)
+        int (*status_callback)(void *object, int friend_num, int device_id, uint8_t status),
+        int (*data_callback)(void *object, int friend_num, int device_id, uint8_t *data, uint16_t length),
+        int (*lossy_data_callback)(void *object, int friend_num, int device_id, const uint8_t *data, uint16_t length),
+        void *object, int friend_number, int device_number)
 {
     Tox_Conn *tox_con = get_conn(tox_conns, toxconn_id);
 
@@ -623,9 +629,13 @@ int toxconn_set_callbacks(Tox_Connections *tox_conns, int toxconn_id, unsigned i
         tox_con->callbacks[index].data_callback_object =
             tox_con->callbacks[index].lossy_data_callback_object = object;
 
-    tox_con->callbacks[index].status_callback_id =
-        tox_con->callbacks[index].data_callback_id =
-            tox_con->callbacks[index].lossy_data_callback_id = number;
+    tox_con->callbacks[index].status_callback_friend_id =
+        tox_con->callbacks[index].data_callback_friend_id =
+            tox_con->callbacks[index].lossy_data_callback_friend_id = friend_number;
+
+    tox_con->callbacks[index].status_callback_device_id =
+        tox_con->callbacks[index].data_callback_device_id =
+            tox_con->callbacks[index].lossy_data_callback_device_id = device_number;
     return 0;
 }
 
@@ -729,7 +739,7 @@ void set_tox_conn_request_callback(Tox_Connections *tox_conns,
  *  return  0 if it sent the friend request directly to the friend.
  *  return the number of peers it was routed through if it did not send it directly.
  */
-int send_tox_conn_request_pkt(Tox_Connections *tox_conns, int toxconn_id, uint32_t nospam_num, const uint8_t *data,
+int send_toxconn_request_pkt(Tox_Connections *tox_conns, int toxconn_id, uint32_t nospam_num, const uint8_t *data,
                                uint16_t length)
 {
     if (1 + sizeof(nospam_num) + length > ONION_CLIENT_MAX_DATA_SIZE || length == 0)

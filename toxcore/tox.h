@@ -1197,6 +1197,58 @@ typedef enum TOX_ERR_FRIEND_ADD {
 
 } TOX_ERR_FRIEND_ADD;
 
+typedef enum TOX_ERR_FRIEND_ADD_DEVICE {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_NULL,
+
+    /**
+     * The length of the friend request message exceeded
+     * TOX_MAX_FRIEND_REQUEST_LENGTH.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_TOO_LONG,
+
+    /**
+     * The friend request message was empty. This, and the TOO_LONG code will
+     * never be returned from tox_friend_add_norequest.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_NO_MESSAGE,
+
+    /**
+     * The friend address belongs to the sending client.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_OWN_KEY,
+
+    /**
+     * A friend request has already been sent, or the address belongs to a friend
+     * that is already on the friend list.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_ALREADY_SENT,
+
+    /**
+     * The friend address checksum failed.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_BAD_CHECKSUM,
+
+    /**
+     * The friend was already there, but the nospam value was different.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_SET_NEW_NOSPAM,
+
+    /**
+     * A memory allocation failed when trying to increase the friend list size.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_MALLOC,
+
+} TOX_ERR_FRIEND_ADD_DEVICE;
+
 
 /**
  * Add a friend to the friend list and send a friend request.
@@ -1223,6 +1275,20 @@ typedef enum TOX_ERR_FRIEND_ADD {
  */
 uint32_t tox_friend_add(Tox *tox, const uint8_t *address, const uint8_t *message, size_t length,
                         TOX_ERR_FRIEND_ADD *error);
+
+/**
+ * Add a new device to existing friend in list.
+ *
+ * friend_number must exist see Friend numbers in tox_friend_add() function above.
+ *
+ * @param public_key A byte array of length TOX_PUBLIC_KEY_SIZE containing the
+ *   Public Key (not the Address) of the friend to add.
+ * @param friend_number the number given by toxcore of the friend, you wish to connect with this device
+ *
+ * @return will return something probably...
+ */
+uint32_t tox_friend_add_device(Tox *tox, const uint8_t *public_key, uint32_t friend_number,
+                               TOX_ERR_FRIEND_ADD_DEVICE *error);
 
 /**
  * Add a friend without sending a friend request.

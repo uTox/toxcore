@@ -24,6 +24,8 @@ libtoxcore_la_SOURCES = ../toxcore/DHT.h \
                         ../toxcore/tox_connection.c \
                         ../toxcore/Messenger.h \
                         ../toxcore/Messenger.c \
+                        ../toxcore/MDevice.h \
+                        ../toxcore/MDevice.c \
                         ../toxcore/ping.h \
                         ../toxcore/ping.c \
                         ../toxcore/tox.h \

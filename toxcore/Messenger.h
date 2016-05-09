@@ -26,6 +26,7 @@
 #ifndef MESSENGER_H
 #define MESSENGER_H
 
+#include "MDevice.h"
 #include "friend_requests.h"
 #include "tox_connection.h"
 
@@ -271,6 +272,8 @@ struct Messenger {
 
     USERSTATUS userstatus;
 
+    MDevice *devices;
+
     Friend *friendlist;
     uint32_t numfriends;
 
@@ -295,7 +298,7 @@ struct Messenger {
     void (*friend_connectionstatuschange_internal)(struct Messenger *m, uint32_t, uint8_t, void *);
     void *friend_connectionstatuschange_internal_userdata;
 
-    void *group_chat_object; /* Set by new_groupchats()*/
+    void *group_chat_object; /* Set by new_groupchats() */
     void (*group_invite)(struct Messenger *m, uint32_t, const uint8_t *, uint16_t);
     void (*group_message)(struct Messenger *m, uint32_t, const uint8_t *, uint16_t);
 

@@ -26,6 +26,7 @@
 #endif
 
 #include "Messenger.h"
+#include "MDevice.h"
 #include "group.h"
 #include "logger.h"
 
@@ -405,6 +406,7 @@ uint32_t tox_iteration_interval(const Tox *tox)
 void tox_iterate(Tox *tox)
 {
     Messenger *m = tox;
+    do_multidevice(m->devices);
     do_messenger(m);
     do_groupchats(m->group_chat_object);
 }
@@ -417,9 +419,12 @@ void tox_self_get_address(const Tox *tox, uint8_t *address)
     }
 }
 
-bool tox_self_add_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_ADD *error)
+bool tox_self_add_device(Tox *tox, const uint8_t *public_key, TOX_ERR_DEVICE_ADD *error)
 {
-    return 0;
+    if (mdev_add_new_device(tox, public_key) != 0){
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
+        return 0;
+    }
 }
 
 uint32_t tox_self_get_device_count(const Tox *tox)
@@ -597,10 +602,10 @@ uint32_t tox_friend_add(Tox *tox, const uint8_t *address, const uint8_t *message
     return UINT32_MAX;
 }
 
-uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend_number, TOX_ERR_FRIEND_ADD *error)
+uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend_number, TOX_ERR_FRIEND_ADD_DEVICE *error)
 {
     if (!address) {
-        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_NULL);
+        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_DEVICE_NULL);
         return UINT32_MAX;
     }
 
@@ -608,13 +613,12 @@ uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend
     int32_t ret = m_add_device_to_friend(m, address, friend_number);
 
     if (ret >= 0) {
-        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_OK);
+        SET_ERROR_PARAMETER(error, TOX_ERR_FRIEND_ADD_DEVICE_OK);
         return ret;
     }
 
     set_friend_error(ret, error);
-    return UINT32_MAX;
-}
+    return UINT32_MAX;}
 
 uint32_t tox_friend_add_norequest(Tox *tox, const uint8_t *public_key, TOX_ERR_FRIEND_ADD *error)
 {

@@ -33,7 +33,7 @@
 #include <assert.h>
 
 
-int handle_rtp_packet (Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object);
+int handle_rtp_packet (Tox *tox, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object);
 
 
 RTPSession *rtp_new (int payload_type, Messenger *m, uint32_t friendnumber,
@@ -224,9 +224,9 @@ struct RTPMessage *new_message (size_t allocate_len, const uint8_t *data, uint16
 
     return msg;
 }
-int handle_rtp_packet (Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object)
+int handle_rtp_packet (Tox *tox, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object)
 {
-    (void) m;
+    (void) tox;
     (void) friendnumber;
 
     RTPSession *session = object;

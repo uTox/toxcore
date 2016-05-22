@@ -217,7 +217,7 @@ static int recreate_encoder(Group_AV *group_av)
     return 0;
 }
 
-static Group_AV *new_group_av(Group_Chats *g_c, void (*audio_callback)(Messenger *, int, int, const int16_t *,
+static Group_AV *new_group_av(Group_Chats *g_c, void (*audio_callback)(Tox *, int, int, const int16_t *,
                               unsigned int, uint8_t, unsigned int, void *), void *userdata)
 {
     if (!g_c)
@@ -401,7 +401,7 @@ static int handle_group_audio_packet(void *object, int groupnumber, int friendgr
  * return 0 on success.
  * return -1 on failure.
  */
-static int groupchat_enable_av(Group_Chats *g_c, int groupnumber, void (*audio_callback)(Messenger *, int, int,
+static int groupchat_enable_av(Group_Chats *g_c, int groupnumber, void (*audio_callback)(Tox *, int, int,
                                const int16_t *, unsigned int, uint8_t, unsigned int, void *), void *userdata)
 {
     if (groupnumber == -1)
@@ -429,7 +429,7 @@ static int groupchat_enable_av(Group_Chats *g_c, int groupnumber, void (*audio_c
  * return group number on success.
  * return -1 on failure.
  */
-int add_av_groupchat(Group_Chats *g_c, void (*audio_callback)(Messenger *, int, int, const int16_t *, unsigned int,
+int add_av_groupchat(Group_Chats *g_c, void (*audio_callback)(Tox *, int, int, const int16_t *, unsigned int,
                      uint8_t, unsigned int, void *), void *userdata)
 {
     int groupnumber = add_groupchat(g_c, GROUPCHAT_TYPE_AV);
@@ -452,7 +452,7 @@ int add_av_groupchat(Group_Chats *g_c, void (*audio_callback)(Messenger *, int, 
  * returns -1 on failure.
  */
 int join_av_groupchat(Group_Chats *g_c, int32_t friendnumber, const uint8_t *data, uint16_t length,
-                      void (*audio_callback)(Messenger *, int, int, const int16_t *, unsigned int, uint8_t, unsigned int, void *),
+                      void (*audio_callback)(Tox *, int, int, const int16_t *, unsigned int, uint8_t, unsigned int, void *),
                       void *userdata)
 {
     int groupnumber = join_groupchat(g_c, friendnumber, GROUPCHAT_TYPE_AV, data, length);

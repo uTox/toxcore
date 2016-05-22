@@ -28,6 +28,8 @@
 #include "group.h"
 #include "util.h"
 
+typedef struct Tox Tox;
+
 /* return 1 if the groupnumber is not valid.
  * return 0 if the groupnumber is valid.
  */
@@ -425,7 +427,7 @@ static int addpeer(Group_Chats *g_c, int groupnumber, const uint8_t *real_pk, co
     add_to_closest(g_c, groupnumber, real_pk, temp_pk);
 
     if (g_c->peer_namelistchange)
-        g_c->peer_namelistchange(g_c->m, groupnumber, g->numpeers - 1, CHAT_CHANGE_PEER_ADD,
+        g_c->peer_namelistchange(g_c->m->tox, groupnumber, g->numpeers - 1, CHAT_CHANGE_PEER_ADD,
                                  g_c->group_namelistchange_userdata);
 
     if (g->peer_on_join)
@@ -508,7 +510,7 @@ static int delpeer(Group_Chats *g_c, int groupnumber, int peer_index)
     }
 
     if (g_c->peer_namelistchange)
-        g_c->peer_namelistchange(g_c->m, groupnumber, peer_index, CHAT_CHANGE_PEER_DEL, g_c->group_namelistchange_userdata);
+        g_c->peer_namelistchange(g_c->m->tox, groupnumber, peer_index, CHAT_CHANGE_PEER_DEL, g_c->group_namelistchange_userdata);
 
     if (g->peer_on_leave)
         g->peer_on_leave(g->object, groupnumber, peer_index, peer_object);
@@ -537,7 +539,7 @@ static int setnick(Group_Chats *g_c, int groupnumber, int peer_index, const uint
     g->group[peer_index].nick_len = nick_len;
 
     if (g_c->peer_namelistchange)
-        g_c->peer_namelistchange(g_c->m, groupnumber, peer_index, CHAT_CHANGE_PEER_NAME, g_c->group_namelistchange_userdata);
+        g_c->peer_namelistchange(g_c->m->tox, groupnumber, peer_index, CHAT_CHANGE_PEER_NAME, g_c->group_namelistchange_userdata);
 
     return 0;
 }
@@ -560,7 +562,7 @@ static int settitle(Group_Chats *g_c, int groupnumber, int peer_index, const uin
     g->title_len = title_len;
 
     if (g_c->title_callback)
-        g_c->title_callback(g_c->m, groupnumber, peer_index, title, title_len, g_c->title_callback_userdata);
+        g_c->title_callback(g_c->m->tox, groupnumber, peer_index, title, title_len, g_c->title_callback_userdata);
 
     return 0;
 }
@@ -994,7 +996,7 @@ int join_groupchat(Group_Chats *g_c, int32_t friendnumber, uint8_t expected_type
  *
  *  data of length is what needs to be passed to join_groupchat().
  */
-void g_callback_group_invite(Group_Chats *g_c, void (*function)(Messenger *m, int32_t, uint8_t, const uint8_t *,
+void g_callback_group_invite(Group_Chats *g_c, void (*function)(Tox *tox, int32_t, uint8_t, const uint8_t *,
                              uint16_t, void *), void *userdata)
 {
     g_c->invite_callback = function;
@@ -1005,7 +1007,7 @@ void g_callback_group_invite(Group_Chats *g_c, void (*function)(Messenger *m, in
  *
  *  Function(Group_Chats *g_c, int groupnumber, int friendgroupnumber, uint8_t * message, uint16_t length, void *userdata)
  */
-void g_callback_group_message(Group_Chats *g_c, void (*function)(Messenger *m, int, int, const uint8_t *, uint16_t,
+void g_callback_group_message(Group_Chats *g_c, void (*function)(Tox *tox, int, int, const uint8_t *, uint16_t,
                               void *), void *userdata)
 {
     g_c->message_callback = function;
@@ -1016,7 +1018,7 @@ void g_callback_group_message(Group_Chats *g_c, void (*function)(Messenger *m, i
  *
  *  Function(Group_Chats *g_c, int groupnumber, int friendgroupnumber, uint8_t * message, uint16_t length, void *userdata)
  */
-void g_callback_group_action(Group_Chats *g_c, void (*function)(Messenger *m, int, int, const uint8_t *, uint16_t,
+void g_callback_group_action(Group_Chats *g_c, void (*function)(Tox *tox, int, int, const uint8_t *, uint16_t,
                              void *), void *userdata)
 {
     g_c->action_callback = function;
@@ -1040,7 +1042,7 @@ void group_lossy_packet_registerhandler(Group_Chats *g_c, uint8_t byte, int (*fu
  * It gets called every time the name list changes(new peer/name, deleted peer)
  *  Function(Group_Chats *g_c, int groupnumber, int peernumber, TOX_CHAT_CHANGE change, void *userdata)
  */
-void g_callback_group_namelistchange(Group_Chats *g_c, void (*function)(Messenger *m, int, int, uint8_t, void *),
+void g_callback_group_namelistchange(Group_Chats *g_c, void (*function)(Tox *tox, int, int, uint8_t, void *),
                                      void *userdata)
 {
     g_c->peer_namelistchange = function;
@@ -1052,7 +1054,7 @@ void g_callback_group_namelistchange(Group_Chats *g_c, void (*function)(Messenge
  * Function(Group_Chats *g_c, int groupnumber, int friendgroupnumber, uint8_t * title, uint8_t length, void *userdata)
  * if friendgroupnumber == -1, then author is unknown (e.g. initial joining the group)
  */
-void g_callback_group_title(Group_Chats *g_c, void (*function)(Messenger *m, int, int, const uint8_t *, uint8_t,
+void g_callback_group_title(Group_Chats *g_c, void (*function)(Tox *tox, int, int, const uint8_t *, uint8_t,
                             void *), void *userdata)
 {
     g_c->title_callback = function;
@@ -1243,9 +1245,9 @@ int group_title_get(const Group_Chats *g_c, int groupnumber, uint8_t *title, uin
     return max_length;
 }
 
-static void handle_friend_invite_packet(Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length)
+static void handle_friend_invite_packet(Tox *tox, uint32_t friendnumber, const uint8_t *data, uint16_t length)
 {
-    Group_Chats *g_c = m->group_chat_object;
+    Group_Chats *g_c = tox->gc;
 
     if (length <= 1)
         return;
@@ -1262,7 +1264,7 @@ static void handle_friend_invite_packet(Messenger *m, uint32_t friendnumber, con
 
             if (groupnumber == -1) {
                 if (g_c->invite_callback)
-                    g_c->invite_callback(m, friendnumber, *(invite_data + sizeof(uint16_t)), invite_data, invite_length,
+                    g_c->invite_callback(tox, friendnumber, *(invite_data + sizeof(uint16_t)), invite_data, invite_length,
                                          g_c->invite_callback_userdata);
 
                 return;
@@ -1303,7 +1305,7 @@ static void handle_friend_invite_packet(Messenger *m, uint32_t friendnumber, con
             memcpy(&other_groupnum, data + 1, sizeof(uint16_t));
             other_groupnum = ntohs(other_groupnum);
 
-            int friendcon_id = getfriendcon_id(m, friendnumber);
+            int friendcon_id = getfriendcon_id(tox->m, friendnumber);
             uint8_t real_pk[crypto_box_PUBLICKEYBYTES], temp_pk[crypto_box_PUBLICKEYBYTES];
             toxconn_get_public_keys(real_pk, temp_pk, g_c->fr_c, friendcon_id);
 
@@ -1910,7 +1912,7 @@ static void handle_message_packet_group(Group_Chats *g_c, int groupnumber, const
 
             //TODO
             if (g_c->message_callback)
-                g_c->message_callback(g_c->m, groupnumber, index, newmsg, msg_data_len, g_c->message_callback_userdata);
+                g_c->message_callback(g_c->m->tox, groupnumber, index, newmsg, msg_data_len, g_c->message_callback_userdata);
 
             break;
         }
@@ -1925,7 +1927,7 @@ static void handle_message_packet_group(Group_Chats *g_c, int groupnumber, const
 
             //TODO
             if (g_c->action_callback)
-                g_c->action_callback(g_c->m, groupnumber, index, newmsg, msg_data_len, g_c->action_callback_userdata);
+                g_c->action_callback(g_c->m->tox, groupnumber, index, newmsg, msg_data_len, g_c->action_callback_userdata);
 
             break;
         }
@@ -2226,20 +2228,26 @@ void send_name_all_groups(Group_Chats *g_c)
 }
 
 /* Create new groupchat instance. */
-Group_Chats *new_groupchats(Messenger *m)
+Group_Chats *new_groupchats(Tox *tox)
 {
-    if (!m)
+    if (!tox) {
         return NULL;
+    }
+
+    if (!tox->m) {
+        return NULL;
+    }
 
     Group_Chats *temp = calloc(1, sizeof(Group_Chats));
 
-    if (temp == NULL)
+    if (temp == NULL) {
         return NULL;
+    }
 
-    temp->m = m;
-    temp->fr_c = m->fr_c;
-    m->group_chat_object = temp;
-    m_callback_group_invite(m, &handle_friend_invite_packet);
+    temp->m = tox->m;
+    temp->fr_c = tox->m->fr_c;
+    tox->gc = temp;
+    m_callback_group_invite(tox->m, &handle_friend_invite_packet);
 
     return temp;
 }
@@ -2275,15 +2283,15 @@ void kill_groupchats(Group_Chats *g_c)
     }
 
     m_callback_group_invite(g_c->m, NULL);
-    g_c->m->group_chat_object = 0;
     free(g_c);
+    g_c->tox->gc = 0;
 }
 
 /* Return the number of chats in the instance m.
  * You should use this to determine how much memory to allocate
  * for copy_chatlist.
  */
-uint32_t count_chatlist(Group_Chats *g_c)
+uint32_t count_chatlist(const Group_Chats *g_c)
 {
     uint32_t ret = 0;
     uint32_t i;

@@ -26,6 +26,7 @@
 #include "msi.h"
 #include "rtp.h"
 
+#include "../toxcore/tox.h"
 #include "../toxcore/Messenger.h"
 #include "../toxcore/logger.h"
 #include "../toxcore/util.h"
@@ -138,7 +139,7 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
         goto END;
     }
 
-    if (((Messenger *)tox)->msi_packet) {
+    if (tox->m->msi_packet) {
         rc = TOXAV_ERR_NEW_MULTIPLE;
         goto END;
     }
@@ -157,7 +158,7 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
         goto END;
     }
 
-    av->m = (Messenger *)tox;
+    av->m = tox->m;
     av->msi = msi_new(av->m);
 
     if (av->msi == NULL) {
@@ -167,7 +168,8 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
     }
 
     av->interval = 200;
-    av->msi->av = av;
+    av->msi->av  = av;
+    tox->av      = av;
 
     msi_register_callback(av->msi, callback_invite, msi_OnInvite);
     msi_register_callback(av->msi, callback_start, msi_OnStart);
@@ -178,8 +180,9 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
 
 END:
 
-    if (error)
+    if (error) {
         *error = rc;
+    }
 
     if (rc != TOXAV_ERR_NEW_OK) {
         free(av);
@@ -188,6 +191,7 @@ END:
 
     return av;
 }
+
 void toxav_kill(ToxAV *av)
 {
     if (av == NULL)

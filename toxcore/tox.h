@@ -390,6 +390,14 @@ typedef enum TOX_SAVEDATA_TYPE {
  */
 struct Tox_Options {
 
+    bool enable_messenger;
+
+
+    bool enable_mdevice;
+
+
+    bool enable_groupchats;
+
     /**
      * The type of socket to create.
      *
@@ -548,6 +556,17 @@ void tox_options_free(struct Tox_Options *options);
  *
  ******************************************************************************/
 
+typedef struct Messenger    Messenger;
+typedef struct MDevice      MDevice;
+typedef struct Group_Chats  Group_Chats;
+typedef struct ToxAV        ToxAV;
+
+struct Tox {
+    Messenger   *m;
+    MDevice     *mdev;
+    Group_Chats *gc;
+    ToxAV       *av;
+};
 
 
 typedef enum TOX_ERR_NEW {

@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef MDEV_H
-#define MDEV_H
+#ifndef MULTIDEV_H
+#define MULTIDEV_H
 
 #include "Messenger.h"
 #include "tox_connection.h"
@@ -14,10 +14,23 @@
 #define MAX_NAME_LENGTH 128
 #define MAX_DEVICE_COUNT 16
 
+#define MDEV_CALLBACK_INDEX 0
 
+typedef enum {
+    NO_MDEV,
+    /* Device is blocked */
+    MDEV_REMOVED,
+    MDEV_REFUSED,
+    MDEV_PENDING,
+    /* Device is active */
+    MDEV_OK,
+    MDEV_CONFIRMED,
+    MDEV_ONLINE,
+
+} MDEV_STATUS;
 
 typedef struct {
-    uint8_t     status; //0 no device, 1-3 device confimed, 4-5 device is blocked
+    MDEV_STATUS status; //0 no device, 1-3 device confimed, 4-5 device is blocked
     uint8_t     real_pk[crypto_box_PUBLICKEYBYTES];
 
     int         toxconn_id;
@@ -33,7 +46,9 @@ typedef struct {
 
 typedef struct Messenger Messenger;
 
-typedef struct {
+typedef struct MDevice MDevice;
+
+struct MDevice {
     Messenger       *m;
 
     Networking_Core *net;
@@ -43,14 +58,21 @@ typedef struct {
     Onion_Announce *onion_a;
     Onion_Client *onion_c;
 
-    Tox_Connections *dev_c;
+    Tox_Connections *dev_conns;
 
-    Device          device[MAX_DEVICE_COUNT];
-    uint64_t        device_count;
-    uint64_t        device_online_count;
+    Device          *device;
+
+    uint32_t        device_count;
 
     uint8_t status;
 
-} MDevice;
+};
+
+/* TODO DOCUMENT THIS FXN */
+void do_multidevice(MDevice *dev);
+
+
+/* TODO DOCUMENT THIS FXN */
+int mdev_add_new_device_self(MDevice *dev, const uint8_t *real_pk);
 
 #endif

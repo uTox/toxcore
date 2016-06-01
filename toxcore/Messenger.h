@@ -363,7 +363,7 @@ int32_t m_add_device_to_friend(Tox *tox, const uint8_t *address, uint32_t friend
 /*  return the friend number associated to that client id.
  *  return -1 if no such friend.
  */
-int32_t getfriend_id(const Tox *tox, const uint8_t *real_pk);
+int32_t getfriend_id(const Messenger *m, const uint8_t *real_pk);
 
 /* Copies the public key associated to that friend id into real_pk buffer.
  * Make sure that real_pk is of size crypto_box_PUBLICKEYBYTES.
@@ -371,12 +371,12 @@ int32_t getfriend_id(const Tox *tox, const uint8_t *real_pk);
  *  return 0 if success
  *  return -1 if failure
  */
-int get_real_pk(const Tox *tox, int32_t friendnumber, uint8_t *real_pk);
+int get_real_pk(const Messenger *m, int32_t friendnumber, uint8_t *real_pk);
 
 /*  return friend connection id on success.
  *  return -1 if failure.
  */
-int getfriendcon_id(const Tox *tox, int32_t friendnumber);
+int getfriendcon_id(const Messenger *m, int32_t friendnumber);
 
 /* Remove a friend.
  *
@@ -424,7 +424,7 @@ int m_send_message_generic(Tox *tox, int32_t fr_num, uint8_t type, const uint8_t
  *  return 0 if success.
  *  return -1 if failure.
  */
-int setfriendname(Tox *tox, int32_t friendnumber, const uint8_t *name, uint16_t length);
+int setfriendname(Messenger *m, int32_t friendnumber, const uint8_t *name, uint16_t length);
 
 /* Set our nickname.
  * name must be a string of maximum MAX_NAME_LENGTH length.
@@ -434,7 +434,7 @@ int setfriendname(Tox *tox, int32_t friendnumber, const uint8_t *name, uint16_t 
  *  return 0 if success.
  *  return -1 if failure.
  */
-int setname(Tox *tox, const uint8_t *name, uint16_t length);
+int setname(Messenger *m, const uint8_t *name, uint16_t length);
 
 /*
  * Get your nickname.
@@ -444,7 +444,7 @@ int setname(Tox *tox, const uint8_t *name, uint16_t length);
  *  return length of the name.
  *  return 0 on error.
  */
-uint16_t getself_name(const Tox *tox, uint8_t *name);
+uint16_t getself_name(const Messenger *m, uint8_t *name);
 
 /* Get name of friendnumber and put it in name.
  * name needs to be a valid memory location with a size of at least MAX_NAME_LENGTH (128) bytes.
@@ -452,12 +452,12 @@ uint16_t getself_name(const Tox *tox, uint8_t *name);
  *  return length of name if success.
  *  return -1 if failure.
  */
-int getname(const Tox *tox, int32_t friendnumber, uint8_t *name);
+int getname(const Messenger *m, int32_t friendnumber, uint8_t *name);
 
 /*  return the length of name, including null on success.
  *  return -1 on failure.
  */
-int m_get_name_size(const Tox *tox, int32_t friendnumber);
+int m_get_name_size(const Messenger *m, int32_t friendnumber);
 int m_get_self_name_size(const Messenger *m);
 
 /* Set our user status.
@@ -466,13 +466,13 @@ int m_get_self_name_size(const Messenger *m);
  *  returns 0 on success.
  *  returns -1 on failure.
  */
-int m_set_statusmessage(Tox *tox, const uint8_t *status, uint16_t length);
-int m_set_userstatus(Tox *tox, uint8_t status);
+int m_set_statusmessage(Messenger *m, const uint8_t *status, uint16_t length);
+int m_set_userstatus(Messenger *m, uint8_t status);
 
 /*  return the length of friendnumber's status message, including null on success.
  *  return -1 on failure.
  */
-int m_get_statusmessage_size(const Tox *tox, int32_t friendnumber);
+int m_get_statusmessage_size(const Messenger *m, int32_t friendnumber);
 int m_get_self_statusmessage_size(const Messenger *m);
 
 /* Copy friendnumber's status message into buf, truncating if size is over maxlen.
@@ -482,22 +482,22 @@ int m_get_self_statusmessage_size(const Messenger *m);
  * returns the length of the copied data on success
  * retruns -1 on failure.
  */
-int m_copy_statusmessage(const Tox *tox, int32_t friendnumber, uint8_t *buf, uint32_t maxlen);
-int m_copy_self_statusmessage(const Tox *tox, uint8_t *buf);
+int m_copy_statusmessage(const Messenger *m, int32_t friendnumber, uint8_t *buf, uint32_t maxlen);
+int m_copy_self_statusmessage(const Messenger *m, uint8_t *buf);
 
 /*  return one of USERSTATUS values.
  *  Values unknown to your application should be represented as USERSTATUS_NONE.
  *  As above, the self variant will return our own USERSTATUS.
  *  If friendnumber is invalid, this shall return USERSTATUS_INVALID.
  */
-uint8_t m_get_userstatus(const Tox *tox, int32_t friendnumber);
+uint8_t m_get_userstatus(const Messenger *m, int32_t friendnumber);
 uint8_t m_get_self_userstatus(const Messenger *m);
 
 
 /* returns timestamp of last time friendnumber was seen online or 0 if never seen.
  * if friendnumber is invalid this function will return UINT64_MAX.
  */
-uint64_t m_get_last_online(const Tox *tox, int32_t friendnumber);
+uint64_t m_get_last_online(const Messenger *m, int32_t friendnumber);
 
 /* Set our typing status for a friend.
  * You are responsible for turning it on or off.
@@ -505,14 +505,14 @@ uint64_t m_get_last_online(const Tox *tox, int32_t friendnumber);
  * returns 0 on success.
  * returns -1 on failure.
  */
-int m_set_usertyping(Tox *tox, int32_t friendnumber, uint8_t is_typing);
+int m_set_usertyping(Messenger *m, int32_t friendnumber, uint8_t is_typing);
 
 /* Get the typing status of a friend.
  *
  * returns 0 if friend is not typing.
  * returns 1 if friend is typing.
  */
-int m_get_istyping(const Tox *tox, int32_t friendnumber);
+int m_get_istyping(const Messenger *m, int32_t friendnumber);
 
 /* Set the function that will be executed when a friend request is received.
  *  Function format is function(uint8_t * public_key, uint8_t * data, size_t length)

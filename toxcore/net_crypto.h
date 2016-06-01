@@ -188,7 +188,7 @@ typedef struct {
     uint8_t cookie_length;
 } New_Connection;
 
-typedef struct {
+struct Net_Crypto {
     DHT *dht;
     TCP_Connections *tcp_c;
 
@@ -214,7 +214,9 @@ typedef struct {
     uint32_t current_sleep_time;
 
     BS_LIST ip_port_list;
-} Net_Crypto;
+};
+
+typedef struct Net_Crypto Net_Crypto;
 
 
 /* Set function to be called when someone requests a new connection to us.

@@ -188,7 +188,7 @@ typedef struct {
     void *object;
 } Cryptopacket_Handles;
 
-typedef struct {
+struct DHT {
     Networking_Core *net;
     DHT_Bucket bucket_v4;
     DHT_Bucket bucket_v6;
@@ -225,7 +225,9 @@ typedef struct {
 
     Node_format to_bootstrap[MAX_CLOSE_TO_BOOTSTRAP_NODES];
     unsigned int num_to_bootstrap;
-} DHT;
+};
+
+typedef struct DHT DHT;
 /*----------------------------------------------------------------------------------*/
 
 /* Shared key generations are costly, it is therefor smart to store commonly used

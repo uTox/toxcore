@@ -556,16 +556,34 @@ void tox_options_free(struct Tox_Options *options);
  *
  ******************************************************************************/
 
-typedef struct Messenger    Messenger;
-typedef struct MDevice      MDevice;
-typedef struct Group_Chats  Group_Chats;
-typedef struct ToxAV        ToxAV;
+typedef struct Messenger        Messenger;
+typedef struct MDevice          MDevice;
+typedef struct Group_Chats      Group_Chats;
+typedef struct ToxAV            ToxAV;
+
+typedef struct Networking_Core  Networking_Core;
+typedef struct Net_Crypto       Net_Crypto;
+typedef struct DHT              DHT;
+
+typedef struct Onion            Onion;
+typedef struct Onion_Announce   Onion_Announce;
+typedef struct Onion_Client     Onion_Client;
 
 struct Tox {
-    Messenger   *m;
-    MDevice     *mdev;
-    Group_Chats *gc;
-    ToxAV       *av;
+    Messenger       *m;
+    MDevice         *mdev;
+    Group_Chats     *gc;
+    ToxAV           *av;
+
+    Networking_Core *net;
+    Net_Crypto      *net_crypto; /* TODO decide if we want a single Net_crypto or if it would be better to let each
+                                  * system handle their own. E.g. Mdevice and Messenger would have seperate
+                                  * pub and sec keys */
+    DHT             *dht;
+
+    Onion           *onion;
+    Onion_Announce  *onion_a;
+    Onion_Client    *onion_c;
 };
 
 

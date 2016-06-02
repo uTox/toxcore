@@ -2245,6 +2245,7 @@ Group_Chats *new_groupchats(Tox *tox)
     }
 
     temp->m = tox->m;
+    temp->tox = tox;
     temp->fr_c = tox->m->fr_c;
     tox->gc = temp;
     m_callback_group_invite(tox, &handle_friend_invite_packet);

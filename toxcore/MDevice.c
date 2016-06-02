@@ -253,7 +253,7 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
 
     if (dev_id != -1) {
         if (dev->device[dev_id].status >= FRIEND_CONFIRMED) {
-            printf("ID Already exists in list...\n");
+            printf("Dev ID Already exists in list...\n");
             return -1;
         }
     }

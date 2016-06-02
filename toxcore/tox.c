@@ -279,6 +279,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
 
     Messenger *m = new_messenger(tox, &m_options, &m_error);
     tox->m = m;
+    m->tox = tox;
 
     if (!new_groupchats(tox)) {
         kill_messenger(m);
@@ -302,9 +303,6 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     } else {
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_OK);
     }
-
-    m->tox = tox;
-
 
     return tox;
 }

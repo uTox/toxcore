@@ -431,7 +431,7 @@ static int32_t m_add_device_to_friend_confirmed(Tox *tox, const uint8_t *real_pk
 
     if (friend_id != -1) {
         if (m->friendlist[friend_id].status >= FRIEND_CONFIRMED) {
-            printf("ID Already exists in list...\n");
+            printf("Friend ID Already exists in list...\n");
             return FAERR_ALREADYSENT;
         }
     }
@@ -2591,12 +2591,13 @@ void do_messenger(Tox *tox)
 #define MESSENGER_STATE_COOKIE_TYPE      0x01ce
 #define MESSENGER_STATE_TYPE_NOSPAMKEYS    1
 #define MESSENGER_STATE_TYPE_DHT           2
-#define MESSENGER_STATE_TYPE_FRIENDS       3
+#define MESSENGER_STATE_TYPE_OLDFRIENDS    3    /* Deprecated by *_FRIENDS */
 #define MESSENGER_STATE_TYPE_NAME          4
 #define MESSENGER_STATE_TYPE_STATUSMESSAGE 5
 #define MESSENGER_STATE_TYPE_STATUS        6
 #define MESSENGER_STATE_TYPE_TCP_RELAY     10
 #define MESSENGER_STATE_TYPE_PATH_NODE     11
+#define MESSENGER_STATE_TYPE_FRIENDS       12
 #define MESSENGER_STATE_TYPE_END           255
 
 #define SAVED_FRIEND_REQUEST_SIZE 1024
@@ -2617,15 +2618,34 @@ struct SAVED_FRIEND {
     uint64_t last_seen_time;
 };
 
+/* On-disk friend format for pre multi-device toxcore versions */
+struct SAVED_OLDFRIEND {
+    uint8_t status;
+    uint8_t real_pk[crypto_box_PUBLICKEYBYTES];
+    uint8_t info[SAVED_FRIEND_REQUEST_SIZE]; // the data that is sent during the friend requests we do.
+    uint16_t info_size; // Length of the info.
+    uint8_t name[MAX_NAME_LENGTH];
+    uint16_t name_length;
+    uint8_t statusmessage[MAX_STATUSMESSAGE_LENGTH];
+    uint16_t statusmessage_length;
+    uint8_t userstatus;
+    uint32_t friendrequest_nospam;
+    uint64_t last_seen_time;
+};
+
 static uint32_t saved_friendslist_size(const Messenger *m)
 {
-    return count_friendlist(m) * sizeof(struct SAVED_FRIEND);
+    return sizeof(uint8_t) + count_friendlist(m) * sizeof(struct SAVED_FRIEND);
 }
 
 static uint32_t friends_list_save(const Tox *tox, uint8_t *data)
 {
     uint32_t i, device;
     uint32_t num = 0;
+
+    uint8_t version = 1; /* Should be the latest version understood by friends_list_load */
+    data[0] = version;
+    data++;
 
     for (i = 0; i < tox->m->numfriends; i++) {
         /* For each friend is the list */
@@ -2668,55 +2688,105 @@ static uint32_t friends_list_save(const Tox *tox, uint8_t *data)
         }
     }
 
-    return num * sizeof(struct SAVED_FRIEND);
+    return sizeof(version) + num * sizeof(struct SAVED_FRIEND);
 }
 
-static int friends_list_load(Tox *tox, const uint8_t *data, uint32_t length)
+static int oldfriends_list_load(Messenger *m, const uint8_t *data, uint32_t length)
 {
-    if (length % sizeof(struct SAVED_FRIEND) != 0) {
+    if (length % sizeof(struct SAVED_OLDFRIEND) != 0) {
         return -1;
     }
 
-    uint32_t num = length / sizeof(struct SAVED_FRIEND);
-    uint32_t i, device;
+    uint32_t num = length / sizeof(struct SAVED_OLDFRIEND);
+    uint32_t i;
 
     for (i = 0; i < num; ++i) {
-        struct SAVED_FRIEND temp;
-        memcpy(&temp, data + i * sizeof(struct SAVED_FRIEND), sizeof(struct SAVED_FRIEND));
+        struct SAVED_OLDFRIEND temp;
+        memcpy(&temp, data + i * sizeof(struct SAVED_OLDFRIEND), sizeof(struct SAVED_OLDFRIEND));
 
         if (temp.status >= 3) {
-            int fnum = m_addfriend_norequest(tox, temp.real_pk[0]);
+            int fnum = m_addfriend_norequest(m->tox, temp.real_pk);
 
-            if (fnum < 0) {
+            if (fnum < 0)
                 continue;
-            }
 
-            setfriendname(tox->m, fnum, temp.name, ntohs(temp.name_length));
-            set_friend_statusmessage(tox->m, fnum, temp.statusmessage, ntohs(temp.statusmessage_length));
-            set_friend_userstatus(tox->m, fnum, temp.userstatus);
+            setfriendname(m, fnum, temp.name, ntohs(temp.name_length));
+            set_friend_statusmessage(m, fnum, temp.statusmessage, ntohs(temp.statusmessage_length));
+            set_friend_userstatus(m, fnum, temp.userstatus);
             uint8_t last_seen_time[sizeof(uint64_t)];
             memcpy(last_seen_time, &temp.last_seen_time, sizeof(uint64_t));
             net_to_host(last_seen_time, sizeof(uint64_t));
-            memcpy(&tox->m->friendlist[fnum].last_seen_time, last_seen_time, sizeof(uint64_t));
-
-            for (device = 1; device < MAX_DEVICE_COUNT; ++device) {
-                if (temp.device_status && public_key_valid(temp.real_pk[device])) {
-                    m_add_device_to_friend_confirmed(tox, temp.real_pk[device], fnum);
-                }
-            }
+            memcpy(&m->friendlist[fnum].last_seen_time, last_seen_time, sizeof(uint64_t));
         } else if (temp.status != 0) {
             /* TODO: This is not a good way to do this. */
-            /* TODO: Do we want to add devices for unconfirmed friends? */
             uint8_t address[FRIEND_ADDRESS_SIZE];
-            id_copy(address, temp.real_pk[0]);
+            id_copy(address, temp.real_pk);
             memcpy(address + crypto_box_PUBLICKEYBYTES, &(temp.friendrequest_nospam), sizeof(uint32_t));
             uint16_t checksum = address_checksum(address, FRIEND_ADDRESS_SIZE - sizeof(checksum));
             memcpy(address + crypto_box_PUBLICKEYBYTES + sizeof(uint32_t), &checksum, sizeof(checksum));
-            m_addfriend(tox, address, temp.info, ntohs(temp.info_size));
+            m_addfriend(m->tox, address, temp.info, ntohs(temp.info_size));
         }
     }
 
     return num;
+}
+
+static int friends_list_load(Tox *tox, const uint8_t *data, uint32_t length)
+{
+    if (length < sizeof(uint8_t))
+        return -1;
+    uint8_t version = data[0];
+    data++;
+    length--;
+
+    if (version == 1) {
+        if (length % sizeof(struct SAVED_FRIEND) != 0) {
+            return -1;
+        }
+
+        uint32_t num = length / sizeof(struct SAVED_FRIEND);
+        uint32_t i, device;
+
+        for (i = 0; i < num; ++i) {
+            struct SAVED_FRIEND temp;
+            memcpy(&temp, data + i * sizeof(struct SAVED_FRIEND), sizeof(struct SAVED_FRIEND));
+
+            if (temp.status >= 3) {
+                int fnum = m_addfriend_norequest(tox, temp.real_pk[0]);
+
+                if (fnum < 0) {
+                    continue;
+                }
+
+                setfriendname(tox->m, fnum, temp.name, ntohs(temp.name_length));
+                set_friend_statusmessage(tox->m, fnum, temp.statusmessage, ntohs(temp.statusmessage_length));
+                set_friend_userstatus(tox->m, fnum, temp.userstatus);
+                uint8_t last_seen_time[sizeof(uint64_t)];
+                memcpy(last_seen_time, &temp.last_seen_time, sizeof(uint64_t));
+                net_to_host(last_seen_time, sizeof(uint64_t));
+                memcpy(&tox->m->friendlist[fnum].last_seen_time, last_seen_time, sizeof(uint64_t));
+
+                for (device = 1; device < MAX_DEVICE_COUNT; ++device) {
+                    if (temp.device_status[device] && public_key_valid(temp.real_pk[device])) {
+                        m_add_device_to_friend_confirmed(tox, temp.real_pk[device], fnum);
+                    }
+                }
+            } else if (temp.status != 0) {
+                /* TODO: This is not a good way to do this. */
+                /* TODO: Do we want to add devices for unconfirmed friends? */
+                uint8_t address[FRIEND_ADDRESS_SIZE];
+                id_copy(address, temp.real_pk[0]);
+                memcpy(address + crypto_box_PUBLICKEYBYTES, &(temp.friendrequest_nospam), sizeof(uint32_t));
+                uint16_t checksum = address_checksum(address, FRIEND_ADDRESS_SIZE - sizeof(checksum));
+                memcpy(address + crypto_box_PUBLICKEYBYTES + sizeof(uint32_t), &checksum, sizeof(checksum));
+                m_addfriend(tox, address, temp.info, ntohs(temp.info_size));
+            }
+        }
+
+        return num;
+    } else {
+        return -1;
+    }
 }
 
 /*  return size of the messenger data (for saving) */
@@ -2850,8 +2920,8 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
             DHT_load(tox->dht, data, length);
             break;
 
-        case MESSENGER_STATE_TYPE_FRIENDS:
-            friends_list_load(tox, data, length);
+        case MESSENGER_STATE_TYPE_OLDFRIENDS:
+            oldfriends_list_load(tox->m, data, length);
             break;
 
         case MESSENGER_STATE_TYPE_NAME:
@@ -2901,6 +2971,10 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
 
             break;
         }
+
+        case MESSENGER_STATE_TYPE_FRIENDS:
+            friends_list_load(tox, data, length);
+            break;
 
         case MESSENGER_STATE_TYPE_END: {
             if (length != 0) {

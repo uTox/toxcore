@@ -13,6 +13,7 @@ Thumbs.db
 CMakeCache.txt
 CMakeFiles
 Makefile
+Makefile.user
 cmake_install.cmake
 install_manifest.txt
 tags

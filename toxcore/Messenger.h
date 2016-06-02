@@ -26,9 +26,9 @@
 #ifndef MESSENGER_H
 #define MESSENGER_H
 
-#include "MDevice.h"
 #include "friend_requests.h"
 #include "tox_connection.h"
+#include "tox.h"
 
 #define MAX_NAME_LENGTH 128
 /* TODO: this must depend on other variable. */
@@ -371,12 +371,12 @@ int32_t getfriend_id(const Messenger *m, const uint8_t *real_pk);
  *  return 0 if success
  *  return -1 if failure
  */
-int get_real_pk(const Messenger *m, int32_t friendnumber, uint8_t *real_pk);
+int get_real_pk(const Tox *tox, int32_t friendnumber, uint8_t *real_pk);
 
 /*  return friend connection id on success.
  *  return -1 if failure.
  */
-int getfriendcon_id(const Messenger *m, int32_t friendnumber);
+int getfriendcon_id(const Tox *tox, int32_t friendnumber);
 
 /* Remove a friend.
  *
@@ -457,8 +457,8 @@ int getname(const Messenger *m, int32_t friendnumber, uint8_t *name);
 /*  return the length of name, including null on success.
  *  return -1 on failure.
  */
-int m_get_name_size(const Messenger *m, int32_t friendnumber);
-int m_get_self_name_size(const Messenger *m);
+int m_get_name_size(const Tox *tox, int32_t friendnumber);
+int m_get_self_name_size(const Tox *tox);
 
 /* Set our user status.
  * You are responsible for freeing status after.
@@ -466,14 +466,14 @@ int m_get_self_name_size(const Messenger *m);
  *  returns 0 on success.
  *  returns -1 on failure.
  */
-int m_set_statusmessage(Messenger *m, const uint8_t *status, uint16_t length);
-int m_set_userstatus(Messenger *m, uint8_t status);
+int m_set_statusmessage(Tox *tox, const uint8_t *status, uint16_t length);
+int m_set_userstatus(Tox *tox, uint8_t status);
 
 /*  return the length of friendnumber's status message, including null on success.
  *  return -1 on failure.
  */
-int m_get_statusmessage_size(const Messenger *m, int32_t friendnumber);
-int m_get_self_statusmessage_size(const Messenger *m);
+int m_get_statusmessage_size(const Tox *tox, int32_t friendnumber);
+int m_get_self_statusmessage_size(const Tox *t);
 
 /* Copy friendnumber's status message into buf, truncating if size is over maxlen.
  * Get the size you need to allocate from m_get_statusmessage_size.
@@ -482,22 +482,22 @@ int m_get_self_statusmessage_size(const Messenger *m);
  * returns the length of the copied data on success
  * retruns -1 on failure.
  */
-int m_copy_statusmessage(const Messenger *m, int32_t friendnumber, uint8_t *buf, uint32_t maxlen);
-int m_copy_self_statusmessage(const Messenger *m, uint8_t *buf);
+int m_copy_statusmessage(const Tox *tox, int32_t friendnumber, uint8_t *buf, uint32_t maxlen);
+int m_copy_self_statusmessage(const Tox *tox, uint8_t *buf);
 
 /*  return one of USERSTATUS values.
  *  Values unknown to your application should be represented as USERSTATUS_NONE.
  *  As above, the self variant will return our own USERSTATUS.
  *  If friendnumber is invalid, this shall return USERSTATUS_INVALID.
  */
-uint8_t m_get_userstatus(const Messenger *m, int32_t friendnumber);
-uint8_t m_get_self_userstatus(const Messenger *m);
+uint8_t m_get_userstatus(const Tox *tox, int32_t friendnumber);
+uint8_t m_get_self_userstatus(const Tox *t);
 
 
 /* returns timestamp of last time friendnumber was seen online or 0 if never seen.
  * if friendnumber is invalid this function will return UINT64_MAX.
  */
-uint64_t m_get_last_online(const Messenger *m, int32_t friendnumber);
+uint64_t m_get_last_online(const Tox *tox, int32_t friendnumber);
 
 /* Set our typing status for a friend.
  * You are responsible for turning it on or off.
@@ -505,14 +505,14 @@ uint64_t m_get_last_online(const Messenger *m, int32_t friendnumber);
  * returns 0 on success.
  * returns -1 on failure.
  */
-int m_set_usertyping(Messenger *m, int32_t friendnumber, uint8_t is_typing);
+int m_set_usertyping(Tox *tox, int32_t friendnumber, uint8_t is_typing);
 
 /* Get the typing status of a friend.
  *
  * returns 0 if friend is not typing.
  * returns 1 if friend is typing.
  */
-int m_get_istyping(const Messenger *m, int32_t friendnumber);
+int m_get_istyping(const Tox *tox, int32_t friendnumber);
 
 /* Set the function that will be executed when a friend request is received.
  *  Function format is function(uint8_t * public_key, uint8_t * data, size_t length)
@@ -783,7 +783,7 @@ enum {
  *
  *  if error is not NULL it will be set to one of the values in the enum above.
  */
-Messenger *new_messenger(Messenger_Options *options, unsigned int *error);
+Messenger *new_messenger(Tox* tox, Messenger_Options *options, unsigned int *error);
 
 /* Run this before closing shop
  * Free all datastructures.
@@ -791,19 +791,19 @@ Messenger *new_messenger(Messenger_Options *options, unsigned int *error);
 void kill_messenger(Messenger *m);
 
 /* The main loop that needs to be run at least 20 times per second. */
-void do_messenger(Messenger *m);
+void do_messenger(Tox *m);
 
 /* Return the time in milliseconds before do_messenger() should be called again
  * for optimal performance.
  *
  * returns time (in ms) before the next do_messenger() needs to be run on success.
  */
-uint32_t messenger_run_interval(const Messenger *m);
+uint32_t messenger_run_interval(const Tox *tox);
 
 /* SAVING AND LOADING FUNCTIONS: */
 
 /* return size of the messenger data (for saving). */
-uint32_t messenger_size(const Messenger *m);
+uint32_t messenger_size(const Tox *tox);
 
 /* Save the messenger in data (must be allocated memory of size Messenger_size()) */
 void messenger_save(const Tox *tox, uint8_t *data);
@@ -821,6 +821,6 @@ uint32_t count_friendlist(const Messenger *m);
  * Otherwise, returns the number of elements copied.
  * If the array was too small, the contents
  * of out_list will be truncated to list_size. */
-uint32_t copy_friendlist(const Tox *tox, uint32_t *out_list, uint32_t list_size);
+uint32_t copy_friendlist(const Messenger *m, uint32_t *out_list, uint32_t list_size);
 
 #endif

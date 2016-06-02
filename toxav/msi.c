@@ -85,11 +85,11 @@ static int invoke_callback(MSICall *call, MSICallbackID cb);
 static MSICall *get_call (MSISession *session, uint32_t friend_number);
 MSICall *new_call (MSISession *session, uint32_t friend_number);
 void kill_call (MSICall *call);
-void on_peer_status(Messenger *m, uint32_t friend_number, uint8_t status, void *data);
+void on_peer_status(Tox *tox, uint32_t friend_number, uint8_t status, void *data);
 void handle_init (MSICall *call, const MSIMessage *msg);
 void handle_push (MSICall *call, const MSIMessage *msg);
 void handle_pop (MSICall *call, const MSIMessage *msg);
-void handle_msi_packet (Messenger *m, uint32_t friend_number, const uint8_t *data, uint16_t length, void *object);
+void handle_msi_packet (Tox *tox, uint32_t friend_number, const uint8_t *data, uint16_t length, void *object);
 
 
 /**
@@ -126,10 +126,10 @@ MSISession *msi_new (Messenger *m)
 
     retu->messenger = m;
 
-    m_callback_msi_packet(m, handle_msi_packet, retu);
+    m_callback_msi_packet(m->tox, handle_msi_packet, retu);
 
     /* This is called when remote terminates session */
-    m_callback_connectionstatus_internal_av(m, on_peer_status, retu);
+    m_callback_connectionstatus_internal_av(m->tox, on_peer_status, retu);
 
     LOGGER_DEBUG("New msi session: %p ", retu);
     return retu;
@@ -141,7 +141,7 @@ int msi_kill (MSISession *session)
         return -1;
     }
 
-    m_callback_msi_packet((struct Messenger *) session->messenger, NULL, NULL);
+    m_callback_msi_packet(session->messenger->tox, NULL, NULL);
 
     if (pthread_mutex_trylock(session->mutex) != 0) {
         LOGGER_ERROR ("Failed to aquire lock on msi mutex");
@@ -450,7 +450,7 @@ int send_message (Messenger *m, uint32_t friend_number, const MSIMessage *msg)
     *it = 0;
     size ++;
 
-    if (m_msi_packet(m, friend_number, parsed, size)) {
+    if (m_msi_packet(m->tox, friend_number, parsed, size)) {
         LOGGER_DEBUG("Sent message");
         return 0;
     }
@@ -594,9 +594,9 @@ CLEAR_CONTAINER:
     free(call);
     session->calls = NULL;
 }
-void on_peer_status(Messenger *m, uint32_t friend_number, uint8_t status, void *data)
+void on_peer_status(Tox *tox, uint32_t friend_number, uint8_t status, void *data)
 {
-    (void)m;
+    (void)tox;
     MSISession *session = data;
 
     switch (status) {
@@ -777,7 +777,7 @@ void handle_pop (MSICall *call, const MSIMessage *msg)
 
     kill_call (call);
 }
-void handle_msi_packet (Messenger *m, uint32_t friend_number, const uint8_t *data, uint16_t length, void *object)
+void handle_msi_packet (Tox *tox, uint32_t friend_number, const uint8_t *data, uint16_t length, void *object)
 {
     LOGGER_DEBUG("Got msi message");
 
@@ -786,7 +786,7 @@ void handle_msi_packet (Messenger *m, uint32_t friend_number, const uint8_t *dat
 
     if (msg_parse_in (&msg, data, length) == -1) {
         LOGGER_WARNING("Error parsing message");
-        send_error(m, friend_number, msi_EInvalidMessage);
+        send_error(tox->m, friend_number, msi_EInvalidMessage);
         return;
     } else {
         LOGGER_DEBUG("Successfully parsed message");
@@ -797,7 +797,7 @@ void handle_msi_packet (Messenger *m, uint32_t friend_number, const uint8_t *dat
 
     if (call == NULL) {
         if (msg.request.value != requ_init) {
-            send_error(m, friend_number, msi_EStrayMessage);
+            send_error(tox->m, friend_number, msi_EStrayMessage);
             pthread_mutex_unlock(session->mutex);
             return;
         }
@@ -805,7 +805,7 @@ void handle_msi_packet (Messenger *m, uint32_t friend_number, const uint8_t *dat
         call = new_call(session, friend_number);
 
         if (call == NULL) {
-            send_error(m, friend_number, msi_ESystem);
+            send_error(tox->m, friend_number, msi_ESystem);
             pthread_mutex_unlock(session->mutex);
             return;
         }

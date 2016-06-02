@@ -576,9 +576,8 @@ struct Tox {
     ToxAV           *av;
 
     Networking_Core *net;
-    Net_Crypto      *net_crypto; /* TODO decide if we want a single Net_crypto or if it would be better to let each
-                                  * system handle their own. E.g. Mdevice and Messenger would have seperate
-                                  * pub and sec keys */
+    Net_Crypto      *net_crypto;
+
     DHT             *dht;
 
     Onion           *onion;

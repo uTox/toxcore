@@ -821,6 +821,6 @@ uint32_t count_friendlist(const Messenger *m);
  * Otherwise, returns the number of elements copied.
  * If the array was too small, the contents
  * of out_list will be truncated to list_size. */
-uint32_t copy_friendlist(const Tox *tox, uint32_t *out_list, uint32_t list_size);
+uint32_t copy_friendlist(const Messenger *m, uint32_t *out_list, uint32_t list_size);
 
 #endif

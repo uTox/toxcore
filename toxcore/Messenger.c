@@ -214,7 +214,7 @@ static int32_t init_new_friend(Tox *tox, const uint8_t *real_pk, uint8_t status)
                                         &handle_status,
                                         &handle_packet,
                                         &handle_custom_lossy_packet,
-                                        m,
+                                        tox,
                                         i,  /* friend number */
                                         0); /* device number always 0 for new friend */
 
@@ -255,7 +255,7 @@ static int32_t init_new_device_friend(Tox *tox, uint32_t friend_number, const ui
                                             &handle_status,
                                             &handle_packet,
                                             &handle_custom_lossy_packet,
-                                            tox->m,
+                                            tox,
                                             friend_number,
                                             i);
 

@@ -2284,8 +2284,8 @@ void kill_groupchats(Group_Chats *g_c)
     }
 
     m_callback_group_invite(g_c->tox, NULL);
-    free(g_c);
     g_c->tox->gc = 0;
+    free(g_c);
 }
 
 /* Return the number of chats in the instance m.

@@ -50,14 +50,7 @@ typedef struct Messenger Messenger;
 typedef struct MDevice MDevice;
 
 struct MDevice {
-    Messenger       *m;
-
-    Networking_Core *net;
-    Net_Crypto *net_crypto;
-
-    Onion *onion;
-    Onion_Announce *onion_a;
-    Onion_Client *onion_c;
+    Tox* tox;
 
     Tox_Connections *dev_conns;
 
@@ -66,7 +59,6 @@ struct MDevice {
     uint32_t        device_count;
 
     uint8_t status;
-
 };
 
 typedef struct Tox Tox;
@@ -74,8 +66,10 @@ typedef struct Tox Tox;
 /* TODO DOCUMENT THIS FXN */
 void do_multidevice(MDevice *dev);
 
+/* TODO DOCUMENT THIS FXN */
+MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error);
 
 /* TODO DOCUMENT THIS FXN */
-int mdev_add_new_device_self(MDevice *dev, const uint8_t *real_pk);
+int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk);
 
 #endif

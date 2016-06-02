@@ -297,16 +297,14 @@ typedef struct {
     void *object;
 } Packet_Handles;
 
-struct Networking_Core {
+typedef struct Networking_Core {
     Packet_Handles packethandlers[256];
 
     sa_family_t family;
     uint16_t port;
     /* Our UDP socket. */
     sock_t sock;
-};
-
-typedef struct Networking_Core Networking_Core;
+} Networking_Core;
 
 /* Run this before creating sockets.
  *

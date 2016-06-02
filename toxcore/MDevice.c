@@ -42,7 +42,7 @@ static int send_online_packet(MDevice *dev, int32_t dev_num, int32_t unused)
     }
 
     uint8_t packet = PACKET_ID_ONLINE;
-    return write_cryptpacket(dev->net_crypto,
+    return write_cryptpacket(dev->tox->net_crypto,
                              toxconn_crypt_connection_id(dev->dev_conns, dev->device[dev_num].toxconn_id),
                              &packet, sizeof(packet), 0) != -1;
 }
@@ -116,7 +116,7 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
 }
 
 /* TODO replace the options here with our own! */
-MDevice *new_mdevice(Messenger_Options *options, unsigned int *error)
+MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error)
 {
     MDevice *dev = calloc(1, sizeof(MDevice));
 
@@ -124,22 +124,24 @@ MDevice *new_mdevice(Messenger_Options *options, unsigned int *error)
         *error = MESSENGER_ERROR_OTHER;
     }
 
-    if (!m) {
+    if (!dev) {
         return NULL;
     }
+
+    dev->tox = tox;
 
     unsigned int net_err = 0;
 
     if (options->udp_disabled) {
         /* this is the easiest way to completely disable UDP without changing too much code. */
-        dev->net = calloc(1, sizeof(Networking_Core));
+        dev->tox->net = calloc(1, sizeof(Networking_Core));
     } else {
         IP ip;
         ip_init(&ip, options->ipv6enabled);
-        dev->net = new_networking_ex(ip, options->port_range[0], options->port_range[1], &net_err);
+        dev->tox->net = new_networking_ex(ip, options->port_range[0], options->port_range[1], &net_err);
     }
 
-    if (dev->net == NULL) {
+    if (dev->tox->net == NULL) {
         free(dev);
 
         if (error && net_err == 1) {
@@ -149,71 +151,45 @@ MDevice *new_mdevice(Messenger_Options *options, unsigned int *error)
         return NULL;
     }
 
-    dev->dht = new_DHT(dev->net);
+    dev->tox->dht = new_DHT(dev->tox->net);
 
-    if (dev->dht == NULL) {
-        kill_networking(dev->net);
+    if (dev->tox->dht == NULL) {
+        kill_networking(dev->tox->net);
         free(dev);
         return NULL;
     }
 
-    dev->net_crypto = new_net_crypto(dev->dht, &options->proxy_info);
+    dev->tox->net_crypto = new_net_crypto(dev->tox->dht, &options->proxy_info);
 
-    if (dev->net_crypto == NULL) {
-        kill_networking(dev->net);
-        kill_DHT(dev->dht);
+    if (dev->tox->net_crypto == NULL) {
+        kill_networking(dev->tox->net);
+        kill_DHT(dev->tox->dht);
         free(dev);
         return NULL;
     }
 
-    dev->onion      = new_onion(dev->dht);
-    dev->onion_a    = new_onion_announce(dev->dht);
-    dev->onion_c    = new_onion_client(dev->net_crypto);
-    dev->fr_c       = new_tox_conns(dev->onion_c);
+    dev->tox->onion      = new_onion(dev->tox->dht);
+    dev->tox->onion_a    = new_onion_announce(dev->tox->dht);
+    dev->tox->onion_c    = new_onion_client(dev->tox->net_crypto);
+    dev->dev_conns       = new_tox_conns(dev->tox->onion_c);
 
-    if (!(dev->onion && dev->onion_a && dev->onion_c)) {
-        kill_tox_conns(dev->fr_c);
-        kill_onion(dev->onion);
-        kill_onion_announce(dev->onion_a);
-        kill_onion_client(dev->onion_c);
-        kill_net_crypto(dev->net_crypto);
-        kill_DHT(dev->dht);
-        kill_networking(dev->net);
+    if (!(dev->tox->onion && dev->tox->onion_a && dev->tox->onion_c)) {
+        kill_tox_conns(dev->dev_conns);
+        kill_onion(dev->tox->onion);
+        kill_onion_announce(dev->tox->onion_a);
+        kill_onion_client(dev->tox->onion_c);
+        kill_net_crypto(dev->tox->net_crypto);
+        kill_DHT(dev->tox->dht);
+        kill_networking(dev->tox->net);
         free(dev);
         return NULL;
     }
-
-    if (options->tcp_server_port) {
-        dev->tcp_server = new_TCP_server(options->ipv6enabled, 1, &options->tcp_server_port, dev->dht->self_secret_key, dev->onion);
-
-        if (dev->tcp_server == NULL) {
-            kill_tox_conns(dev->fr_c);
-            kill_onion(dev->onion);
-            kill_onion_announce(dev->onion_a);
-            kill_onion_client(dev->onion_c);
-            kill_net_crypto(dev->net_crypto);
-            kill_DHT(dev->dht);
-            kill_networking(dev->net);
-            free(dev);
-
-            if (error) {
-                *error = MESSENGER_ERROR_TCP_SERVER;
-            }
-
-            return NULL;
-        }
-    }
-
-    dev->options = *options;
-    friendreq_init(&(dev->fr), dev->fr_c);
-    set_nospam(&(dev->fr), random_int());
-    set_filter_function(&(dev->fr), &friend_already_added, m);
 
     if (error) {
         *error = MESSENGER_ERROR_NONE;
     }
 
-    return m;
+    return dev;
 }
 
 /* Run this before closing shop. */
@@ -237,8 +213,8 @@ void do_multidevice(MDevice *dev)
         return;
     }
 
-    do_net_crypto(dev->net_crypto);
-    do_onion_client(dev->onion_c);
+    do_net_crypto(dev->tox->net_crypto);
+    do_onion_client(dev->tox->onion_c);
 
     do_tox_connections(dev->dev_conns);
 }

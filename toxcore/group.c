@@ -687,8 +687,8 @@ int add_groupchat(Group_Chats *g_c, uint8_t type)
     new_symmetric_key(g->identifier + 1);
     g->identifier[0] = type;
     g->peer_number = 0; /* Founder is peer 0. */
-    memcpy(g->real_pk, g_c->m->net_crypto->self_public_key, crypto_box_PUBLICKEYBYTES);
-    int peer_index = addpeer(g_c, groupnumber, g->real_pk, g_c->m->dht->self_public_key, 0);
+    memcpy(g->real_pk, g_c->tox->net_crypto->self_public_key, crypto_box_PUBLICKEYBYTES);
+    int peer_index = addpeer(g_c, groupnumber, g->real_pk, g_c->tox->dht->self_public_key, 0);
 
     if (peer_index == -1) {
         return -1;
@@ -919,7 +919,7 @@ int invite_friend(Group_Chats *g_c, int32_t friendnumber, int groupnumber)
     memcpy(invite + 1, &groupchat_num, sizeof(groupchat_num));
     memcpy(invite + 1 + sizeof(groupchat_num), g->identifier, GROUP_IDENTIFIER_LENGTH);
 
-    if (send_group_invite_packet(g_c->m, friendnumber, invite, sizeof(invite))) {
+    if (send_group_invite_packet(g_c->tox, friendnumber, invite, sizeof(invite))) {
         return 0;
     } else {
         wipe_group_chat(g_c, groupnumber);
@@ -944,7 +944,7 @@ int join_groupchat(Group_Chats *g_c, int32_t friendnumber, uint8_t expected_type
     if (data[sizeof(uint16_t)] != expected_type)
         return -1;
 
-    int friendcon_id = getfriendcon_id(g_c->m, friendnumber);
+    int friendcon_id = getfriendcon_id(g_c->tox, friendnumber);
 
     if (friendcon_id == -1)
         return -1;
@@ -962,14 +962,14 @@ int join_groupchat(Group_Chats *g_c, int32_t friendnumber, uint8_t expected_type
     uint16_t group_num = htons(groupnumber);
     g->status = GROUPCHAT_STATUS_VALID;
     g->number_joined = -1;
-    memcpy(g->real_pk, g_c->m->net_crypto->self_public_key, crypto_box_PUBLICKEYBYTES);
+    memcpy(g->real_pk, g_c->tox->net_crypto->self_public_key, crypto_box_PUBLICKEYBYTES);
 
     uint8_t response[INVITE_RESPONSE_PACKET_SIZE];
     response[0] = INVITE_RESPONSE_ID;
     memcpy(response + 1, &group_num, sizeof(uint16_t));
     memcpy(response + 1 + sizeof(uint16_t), data, sizeof(uint16_t) + GROUP_IDENTIFIER_LENGTH);
 
-    if (send_group_invite_packet(g_c->m, friendnumber, response, sizeof(response))) {
+    if (send_group_invite_packet(g_c->tox, friendnumber, response, sizeof(response))) {
         uint16_t other_groupnum;
         memcpy(&other_groupnum, data, sizeof(other_groupnum));
         other_groupnum = ntohs(other_groupnum);
@@ -1305,7 +1305,7 @@ static void handle_friend_invite_packet(Tox *tox, uint32_t friendnumber, const u
             memcpy(&other_groupnum, data + 1, sizeof(uint16_t));
             other_groupnum = ntohs(other_groupnum);
 
-            int friendcon_id = getfriendcon_id(tox->m, friendnumber);
+            int friendcon_id = getfriendcon_id(tox, friendnumber);
             uint8_t real_pk[crypto_box_PUBLICKEYBYTES], temp_pk[crypto_box_PUBLICKEYBYTES];
             toxconn_get_public_keys(real_pk, temp_pk, g_c->fr_c, friendcon_id);
 
@@ -1534,7 +1534,7 @@ static int handle_send_peers(Group_Chats *g_c, int groupnumber, const uint8_t *d
             return -1;
 
         if (g->status == GROUPCHAT_STATUS_VALID
-                && public_key_cmp(d, g_c->m->net_crypto->self_public_key) == 0) {
+                && public_key_cmp(d, g_c->tox->net_crypto->self_public_key) == 0) {
             g->peer_number = peer_num;
             g->status = GROUPCHAT_STATUS_CONNECTED;
             group_name_send(g_c, groupnumber, g_c->m->name, g_c->m->name_length);
@@ -2247,7 +2247,7 @@ Group_Chats *new_groupchats(Tox *tox)
     temp->m = tox->m;
     temp->fr_c = tox->m->fr_c;
     tox->gc = temp;
-    m_callback_group_invite(tox->m, &handle_friend_invite_packet);
+    m_callback_group_invite(tox, &handle_friend_invite_packet);
 
     return temp;
 }
@@ -2282,7 +2282,7 @@ void kill_groupchats(Group_Chats *g_c)
         del_groupchat(g_c, i);
     }
 
-    m_callback_group_invite(g_c->m, NULL);
+    m_callback_group_invite(g_c->tox, NULL);
     free(g_c);
     g_c->tox->gc = 0;
 }

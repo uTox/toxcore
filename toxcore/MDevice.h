@@ -93,7 +93,7 @@ typedef enum {
 } MDEV_STATUS;
 
 typedef struct {
-    MDEV_STATUS status; //0 no device, 1-3 device confimed, 4-5 device is blocked
+    MDEV_STATUS status; //0 no device, 1-2 device is blocked, 4-6 device confimed
     uint8_t     real_pk[crypto_box_PUBLICKEYBYTES];
 
     int         toxconn_id;

@@ -950,42 +950,9 @@ typedef enum TOX_ERR_DEVICE_GET {
     TOX_ERR_DEVICE_GET_NULL,
 
     /**
-     * The length of the friend request message exceeded
-     * TOX_MAX_FRIEND_REQUEST_LENGTH.
+     * The device does not exist
      */
-    TOX_ERR_DEVICE_GET_TOO_LONG,
-
-    /**
-     * The friend request message was empty. This, and the TOO_LONG code will
-     * never be returned from tox_friend_add_norequest.
-     */
-    TOX_ERR_DEVICE_GET_NO_MESSAGE,
-
-    /**
-     * The friend address belongs to the sending client.
-     */
-    TOX_ERR_DEVICE_GET_OWN_KEY,
-
-    /**
-     * A friend request has already been sent, or the address belongs to a friend
-     * that is already on the friend list.
-     */
-    TOX_ERR_DEVICE_GET_ALREADY_SENT,
-
-    /**
-     * The friend address checksum failed.
-     */
-    TOX_ERR_DEVICE_GET_BAD_CHECKSUM,
-
-    /**
-     * The friend was already there, but the nospam value was different.
-     */
-    TOX_ERR_DEVICE_GET_SET_NEW_NOSPAM,
-
-    /**
-     * A memory allocation failed when trying to increase the friend list size.
-     */
-    TOX_ERR_DEVICE_GET_MALLOC,
+    TOX_ERR_DEVICE_GET_NODEV,
 
 } TOX_ERR_DEVICE_GET;
 
@@ -1003,59 +970,31 @@ typedef enum TOX_ERR_DEVICE_DEL {
     TOX_ERR_DEVICE_DEL_NULL,
 
     /**
-     * The length of the friend request message exceeded
-     * TOX_MAX_FRIEND_REQUEST_LENGTH.
+     * The device does not exist
      */
-    TOX_ERR_DEVICE_DEL_TOO_LONG,
-
-    /**
-     * The friend request message was empty. This, and the TOO_LONG code will
-     * never be returned from tox_friend_add_norequest.
-     */
-    TOX_ERR_DEVICE_DEL_NO_MESSAGE,
-
-    /**
-     * The friend address belongs to the sending client.
-     */
-    TOX_ERR_DEVICE_DEL_OWN_KEY,
-
-    /**
-     * A friend request has already been sent, or the address belongs to a friend
-     * that is already on the friend list.
-     */
-    TOX_ERR_DEVICE_DEL_ALREADY_SENT,
-
-    /**
-     * The friend address checksum failed.
-     */
-    TOX_ERR_DEVICE_DEL_BAD_CHECKSUM,
-
-    /**
-     * The friend was already there, but the nospam value was different.
-     */
-    TOX_ERR_DEVICE_DEL_SET_NEW_NOSPAM,
-
-    /**
-     * A memory allocation failed when trying to increase the friend list size.
-     */
-    TOX_ERR_DEVICE_DEL_MALLOC,
+    TOX_ERR_DEVICE_DEL_NODEV,
 
 } TOX_ERR_DEVICE_DEL;
 
 
 /**
+* Add a device, if it adds you in return, you and it become associated
 */
 bool tox_self_add_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_ADD *error);
 
 /**
+* Returns the number of associated devices
 */
 uint32_t tox_self_get_device_count(const Tox *tox);
 
 /**
+* Retreives the public-key of an associated device
 */
-bool tox_self_get_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_GET *error);
+bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *public_key, TOX_ERR_DEVICE_GET *error);
 
 /**
+* Permanently removes and blacklists an associated device
+* Use this function if the device was lost or stolen
 */
 bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *error);
 

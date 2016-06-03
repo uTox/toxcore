@@ -254,3 +254,9 @@ uint8_t *mdev_save(const Tox *tox, uint8_t *data)
     /* TODO: */
     return data;
 }
+
+int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type)
+{
+    /* TODO: */
+    return 0;
+}

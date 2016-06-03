@@ -808,8 +808,8 @@ uint32_t messenger_size(const Tox *tox);
 /* Save the messenger in data (must be allocated memory of size Messenger_size()) */
 uint8_t *messenger_save(const Tox *tox, uint8_t *data);
 
-/* Load the messenger from data of size length. */
-int messenger_load(Tox *tox, const uint8_t *data, uint32_t length);
+/* Loads the messenger data from the sections of the saved state */
+int messenger_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type);
 
 /* Return the number of friends in the instance m.
  * You should use this to determine how much memory to allocate

@@ -2837,30 +2837,15 @@ uint8_t *messenger_save(const Tox *tox, uint8_t *data)
     return data;
 }
 
-static int messenger_load_state_callback(void *outer, const uint8_t *data, uint32_t length, uint16_t type)
+int messenger_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type)
 {
-    Tox *tox = outer;
-
     switch (type) {
-        case SAVE_STATE_TYPE_NOSPAMKEYS:
-            if (length == crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES + sizeof(uint32_t)) {
-                set_nospam(tox->net_crypto, *(uint32_t *)data);
-                load_secret_key(tox->net_crypto, (&data[sizeof(uint32_t)]) + crypto_box_PUBLICKEYBYTES);
-
-                if (public_key_cmp((&data[sizeof(uint32_t)]), tox->net_crypto->self_public_key) != 0) {
-                    return -1;
-                }
-            } else
-                return -1;    /* critical */
-
-            break;
-
-        case SAVE_STATE_TYPE_DHT:
-            DHT_load(tox->dht, data, length);
-            break;
-
         case SAVE_STATE_TYPE_OLDFRIENDS:
             oldfriends_list_load(tox->m, data, length);
+            break;
+
+        case SAVE_STATE_TYPE_FRIENDS:
+            friends_list_load(tox, data, length);
             break;
 
         case SAVE_STATE_TYPE_NAME:
@@ -2894,65 +2879,9 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
 
             break;
         }
-
-        case SAVE_STATE_TYPE_PATH_NODE: {
-            Node_format nodes[NUM_SAVED_PATH_NODES];
-
-            if (length == 0) {
-                break;
-            }
-
-            int i, num = unpack_nodes(nodes, NUM_SAVED_PATH_NODES, 0, data, length, 0);
-
-            for (i = 0; i < num; ++i) {
-                onion_add_bs_path_node(tox->onion_c, nodes[i].ip_port, nodes[i].public_key);
-            }
-
-            break;
-        }
-
-        case SAVE_STATE_TYPE_FRIENDS:
-            friends_list_load(tox, data, length);
-            break;
-
-        case SAVE_STATE_TYPE_END: {
-            if (length != 0) {
-                return -1;
-            }
-
-            return -2;
-            break;
-        }
-
-#ifdef DEBUG
-
-        default:
-            fprintf(stderr, "Load state: contains unrecognized part (len %u, type %u)\n",
-                    length, type);
-            break;
-#endif
     }
 
     return 0;
-}
-
-/* Load the messenger from data of size length. */
-int messenger_load(Tox *tox, const uint8_t *data, uint32_t length)
-{
-    uint32_t data32[2];
-    uint32_t cookie_len = sizeof(data32);
-
-    if (length < cookie_len)
-        return -1;
-
-    memcpy(data32, data, sizeof(uint32_t));
-    lendian_to_host32(data32 + 1, data + sizeof(uint32_t));
-
-    if (!data32[0] && (data32[1] == SAVE_STATE_COOKIE_GLOBAL))
-        return load_state(messenger_load_state_callback, tox, data + cookie_len,
-                          length - cookie_len, SAVE_STATE_COOKIE_TYPE);
-    else
-        return -1;
 }
 
 /* Return the number of friends in the instance m.

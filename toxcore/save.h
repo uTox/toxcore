@@ -68,4 +68,15 @@ void save_get_savedata(const Tox *tox, uint8_t *savedata);
  */
 uint8_t *save_write_subheader(uint8_t *data, uint32_t len, uint16_t type, uint32_t cookie);
 
+/**
+ * Restores the state of `tox` and its optional components from the saved data
+ * Will call the *_save_read_sections_callback for each Tox component
+ */
+int save_load_from_data(Tox *tox, const uint8_t *data, uint32_t length);
+
+/* Runs a callback with the content of each section in the save data */
+typedef int (*save_read_sections_callback_func)(void *outer, const uint8_t *data, uint32_t len, uint16_t type);
+int save_read_sections(save_read_sections_callback_func save_read_sections_callback, void *outer,
+               const uint8_t *data, uint32_t length, uint16_t cookie_inner);
+
 #endif // SAVE_H

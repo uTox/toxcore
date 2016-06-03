@@ -302,7 +302,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
-    if (load_savedata_tox && messenger_load(tox, options->savedata_data, options->savedata_length) == -1) {
+    if (load_savedata_tox && save_load_from_data(tox, options->savedata_data, options->savedata_length) == -1) {
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_LOAD_BAD_FORMAT);
     } else if (load_savedata_sk) {
         load_secret_key(tox->net_crypto, options->savedata_data);

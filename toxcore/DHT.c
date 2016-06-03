@@ -2248,7 +2248,7 @@ int DHT_load(DHT *dht, const uint8_t *data, uint32_t length)
         lendian_to_host32(&data32, data);
 
         if (data32 == DHT_STATE_COOKIE_GLOBAL)
-            return load_state(dht_load_state_callback, dht, data + cookie_len,
+            return save_read_sections(dht_load_state_callback, dht, data + cookie_len,
                               length - cookie_len, DHT_STATE_COOKIE_TYPE);
     }
 

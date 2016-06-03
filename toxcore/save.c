@@ -27,6 +27,65 @@
 #include "MDevice.h"
 #include "Messenger.h"
 
+/* Loads the non-otional state from the sections of the saved data */
+static int save_read_sections_tox_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type)
+{
+    switch (type) {
+        case SAVE_STATE_TYPE_NOSPAMKEYS:
+            if (length == crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES + sizeof(uint32_t)) {
+                set_nospam(tox->net_crypto, *(uint32_t *)data);
+                load_secret_key(tox->net_crypto, (&data[sizeof(uint32_t)]) + crypto_box_PUBLICKEYBYTES);
+
+                if (public_key_cmp((&data[sizeof(uint32_t)]), tox->net_crypto->self_public_key) != 0) {
+                    return -1;
+                }
+            } else
+                return -1;    /* critical */
+
+            break;
+
+        case SAVE_STATE_TYPE_DHT:
+            DHT_load(tox->dht, data, length);
+            break;
+
+        case SAVE_STATE_TYPE_PATH_NODE: {
+            Node_format nodes[NUM_SAVED_PATH_NODES];
+
+            if (length == 0) {
+                break;
+            }
+
+            int i, num = unpack_nodes(nodes, NUM_SAVED_PATH_NODES, 0, data, length, 0);
+
+            for (i = 0; i < num; ++i) {
+                onion_add_bs_path_node(tox->onion_c, nodes[i].ip_port, nodes[i].public_key);
+            }
+
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static int save_read_sections_dispatch(void *outer, const uint8_t *data, uint32_t length, uint16_t type)
+{
+    Tox *tox = outer;
+
+    if (type == SAVE_STATE_TYPE_END) {
+        if (length != 0)
+            return -1;
+        else
+            return -2;
+    }
+
+    if (tox->m && messenger_save_read_sections_callback(tox, data, length, type) < 0)
+        return -1;
+    if (tox->mdev && mdev_save_read_sections_callback(tox, data, length, type) < 0)
+        return -1;
+    return save_read_sections_tox_callback(tox, data, length, type);
+}
+
 uint8_t *save_write_subheader(uint8_t *data, uint32_t len, uint16_t type, uint32_t cookie)
 {
     host_to_lendian32(data, len);
@@ -76,7 +135,7 @@ void save_get_savedata(const Tox *tox, uint8_t *data)
 
     /* Write mandatory data */
 #ifdef DEBUG
-    assert(sizeof(get_nospam(&(tox->m->fr))) == sizeof(uint32_t));
+    assert(sizeof(get_nospam(tox->net_crypto)) == sizeof(uint32_t));
 #endif
     len = size32 + crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES;
     type = SAVE_STATE_TYPE_NOSPAMKEYS;
@@ -114,3 +173,76 @@ void save_get_savedata(const Tox *tox, uint8_t *data)
     /* Write final section */
     save_write_subheader(data, 0, SAVE_STATE_TYPE_END, SAVE_STATE_COOKIE_TYPE);
 }
+
+int save_load_from_data(Tox *tox, const uint8_t *data, uint32_t length)
+{
+    uint32_t data32[2];
+    uint32_t cookie_len = sizeof(data32);
+
+    if (length < cookie_len)
+        return -1;
+
+    memcpy(data32, data, sizeof(uint32_t));
+    lendian_to_host32(data32 + 1, data + sizeof(uint32_t));
+
+    if (data32[0]!=0 || data32[1] != SAVE_STATE_COOKIE_GLOBAL)
+        return -1;
+
+    return save_read_sections(save_read_sections_dispatch, tox, data + cookie_len,
+                                length - cookie_len, SAVE_STATE_COOKIE_TYPE);
+}
+
+int save_read_sections(save_read_sections_callback_func save_read_sections_callback, void *outer,
+               const uint8_t *data, uint32_t length, uint16_t cookie_inner)
+{
+    if (!save_read_sections_callback || !data) {
+#ifdef DEBUG
+        fprintf(stderr, "save_read_sections() called with invalid args.\n");
+#endif
+        return -1;
+    }
+
+    uint16_t type;
+    uint32_t length_sub, cookie_type;
+    uint32_t size_head = sizeof(uint32_t) * 2;
+
+    while (length >= size_head) {
+        lendian_to_host32(&length_sub, data);
+        lendian_to_host32(&cookie_type, data + sizeof(length_sub));
+        data += size_head;
+        length -= size_head;
+
+        if (length < length_sub) {
+            /* file truncated */
+#ifdef DEBUG
+            fprintf(stderr, "state data too short: %u < %u\n", length, length_sub);
+#endif
+            return -1;
+        }
+
+        if (lendian_to_host16((cookie_type >> 16)) != cookie_inner) {
+            /* something is not matching up in a bad way, give up */
+#ifdef DEBUG
+            fprintf(stderr, "state data garbeled: %04hx != %04hx\n", (cookie_type >> 16), cookie_inner);
+#endif
+            return -1;
+        }
+
+        type = lendian_to_host16(cookie_type & 0xFFFF);
+
+        int ret = save_read_sections_callback(outer, data, length_sub, type);
+
+        if (ret == -1) {
+            return -1;
+        }
+
+        /* -2 means end of save. */
+        if (ret == -2)
+            return 0;
+
+        data += length_sub;
+        length -= length_sub;
+    }
+
+    return length == 0 ? 0 : -1;
+};

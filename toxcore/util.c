@@ -113,63 +113,6 @@ void lendian_to_host32(uint32_t *dest, const uint8_t *lendian)
     *dest = d;
 }
 
-/* state load/save */
-int load_state(load_state_callback_func load_state_callback, void *outer,
-               const uint8_t *data, uint32_t length, uint16_t cookie_inner)
-{
-    if (!load_state_callback || !data) {
-#ifdef DEBUG
-        fprintf(stderr, "load_state() called with invalid args.\n");
-#endif
-        return -1;
-    }
-
-
-    uint16_t type;
-    uint32_t length_sub, cookie_type;
-    uint32_t size_head = sizeof(uint32_t) * 2;
-
-    while (length >= size_head) {
-        lendian_to_host32(&length_sub, data);
-        lendian_to_host32(&cookie_type, data + sizeof(length_sub));
-        data += size_head;
-        length -= size_head;
-
-        if (length < length_sub) {
-            /* file truncated */
-#ifdef DEBUG
-            fprintf(stderr, "state file too short: %u < %u\n", length, length_sub);
-#endif
-            return -1;
-        }
-
-        if (lendian_to_host16((cookie_type >> 16)) != cookie_inner) {
-            /* something is not matching up in a bad way, give up */
-#ifdef DEBUG
-            fprintf(stderr, "state file garbeled: %04hx != %04hx\n", (cookie_type >> 16), cookie_inner);
-#endif
-            return -1;
-        }
-
-        type = lendian_to_host16(cookie_type & 0xFFFF);
-
-        int ret = load_state_callback(outer, data, length_sub, type);
-
-        if (ret == -1) {
-            return -1;
-        }
-
-        /* -2 means end of save. */
-        if (ret == -2)
-            return 0;
-
-        data += length_sub;
-        length -= length_sub;
-    }
-
-    return length == 0 ? 0 : -1;
-};
-
 int create_recursive_mutex(pthread_mutex_t *mutex)
 {
     pthread_mutexattr_t attr;

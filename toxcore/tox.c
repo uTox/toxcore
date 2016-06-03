@@ -488,6 +488,11 @@ void tox_self_get_address(const Tox *tox, uint8_t *address)
 
 bool tox_self_add_device(Tox *tox, const uint8_t *public_key, TOX_ERR_DEVICE_ADD *error)
 {
+    if (!tox || !tox->mdev || !public_key) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
+        return 0;
+    }
+
     if (mdev_add_new_device_self(tox, public_key) != 0){
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
         return 0;
@@ -498,17 +503,48 @@ bool tox_self_add_device(Tox *tox, const uint8_t *public_key, TOX_ERR_DEVICE_ADD
 
 uint32_t tox_self_get_device_count(const Tox *tox)
 {
-    return 0;
+    if (!tox || !tox->mdev)
+        return 0;
+
+    return tox->mdev->devices_count;
 }
 
-bool tox_self_get_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_GET *error)
-{
-    return 0;
+bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *public_key, TOX_ERR_DEVICE_GET *error)
+{   
+    if (!tox || !tox->mdev) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_NULL);
+        return 0;
+    }
+
+    if (device_num >= tox->mdev->devices_count) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_NODEV);
+        return 0;
+    }
+
+    memcpy(public_key, tox->mdev->devices[device_num].real_pk, sizeof(tox->mdev->devices[device_num].real_pk));
+    SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_OK);
+    return 1;
 }
 
 bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *error)
 {
-    return 0;
+    if (!tox || !tox->mdev) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_NULL);
+        return 0;
+    }
+
+    if (device_num >= tox->mdev->devices_count) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_NODEV);
+        return 0;
+    }
+
+    if (mdev_remove_device(tox, device_num) < 0) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_NODEV);
+        return -1;
+    } else {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_OK);
+        return 0;
+    }
 }
 
 void tox_self_set_nospam(Tox *tox, uint32_t nospam)

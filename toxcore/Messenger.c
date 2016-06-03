@@ -2780,7 +2780,7 @@ uint32_t messenger_size(const Tox *tox)
     if (!tox->m)
         return 0;
 
-    uint32_t size32 = sizeof(uint32_t), sizesubhead = size32 * 2;
+    uint32_t sizesubhead = save_subheader_size();
     return     sizesubhead + saved_friendslist_size(tox->m)         // Friendlist itself.
              + sizesubhead + tox->m->name_length                    // Own nickname.
              + sizesubhead + tox->m->statusmessage_length           // status message

@@ -278,7 +278,6 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     if (!m) {
         return NULL;
     }
-    m->tox = tox;
     tox->m = m;
 
     MDevice *mdev = new_mdevice(tox, &m_options, &m_error);

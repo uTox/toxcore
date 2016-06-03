@@ -40,6 +40,7 @@
 #define SAVE_STATE_TYPE_TCP_RELAY     10
 #define SAVE_STATE_TYPE_PATH_NODE     11
 #define SAVE_STATE_TYPE_FRIENDS       12
+#define SAVE_STATE_TYPE_MDEVICE       13
 #define SAVE_STATE_TYPE_END           255
 
 #define NUM_SAVED_PATH_NODES 8
@@ -66,11 +67,16 @@ void save_get_savedata(const Tox *tox, uint8_t *savedata);
 /**
  * Writes the header for a save data section of length `len` and type `type` to `data`
  */
-uint8_t *save_write_subheader(uint8_t *data, uint32_t len, uint16_t type, uint32_t cookie);
+uint8_t *save_write_subheader(uint8_t *data, size_t len, uint16_t type, uint32_t cookie);
+
+/**
+ * Size of a subheader written by `save_write_subheader`
+ */
+inline size_t save_subheader_size() { return 2*sizeof(uint32_t); }
 
 /**
  * Restores the state of `tox` and its optional components from the saved data
- * Will call the *_save_read_sections_callback for each Tox component
+ * Will call the *_save_read_sections_callback for each non-NULL Tox component
  */
 int save_load_from_data(Tox *tox, const uint8_t *data, uint32_t length);
 

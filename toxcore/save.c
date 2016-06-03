@@ -79,6 +79,7 @@ static int save_read_sections_dispatch(void *outer, const uint8_t *data, uint32_
             return -2;
     }
 
+    /* If anyone returns -1, we abort, so only do that if there's a critical error */
     if (tox->m && messenger_save_read_sections_callback(tox, data, length, type) < 0)
         return -1;
     if (tox->mdev && mdev_save_read_sections_callback(tox, data, length, type) < 0)
@@ -86,8 +87,13 @@ static int save_read_sections_dispatch(void *outer, const uint8_t *data, uint32_
     return save_read_sections_tox_callback(tox, data, length, type);
 }
 
-uint8_t *save_write_subheader(uint8_t *data, uint32_t len, uint16_t type, uint32_t cookie)
+uint8_t *save_write_subheader(uint8_t *data, size_t len, uint16_t type, uint32_t cookie)
 {
+    if (len > UINT32_MAX) {
+        printf("save_write_subheader: Unable to save section bigger than 4GiB!\n");
+        cookie = len = type = 0;
+    }
+
     host_to_lendian32(data, len);
     data += sizeof(uint32_t);
     host_to_lendian32(data, (host_tolendian16(cookie) << 16) | host_tolendian16(type));
@@ -118,7 +124,7 @@ void save_get_savedata(const Tox *tox, uint8_t *data)
 
     size_t data_size = tox_get_savedata_size(tox);
     if (data_size > UINT32_MAX) {
-        printf("The save file would be bigger than 4GiB, unable to save!");
+        printf("save_get_savedata: The save file would be bigger than 4GiB, unable to save!\n");
         return;
     }
     memset(data, 0, data_size);

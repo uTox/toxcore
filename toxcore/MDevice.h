@@ -80,7 +80,6 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 
 /* TODO: These should only live in Messenger.h */
 #define MAX_NAME_LENGTH 128
-#define MAX_DEVICE_COUNT 16
 
 #define MDEV_CALLBACK_INDEX 0
 
@@ -93,7 +92,7 @@ typedef enum {
 } MDEV_STATUS;
 
 typedef struct {
-    MDEV_STATUS status; //0 no device, 1-2 device is blocked, 4-6 device confimed
+    MDEV_STATUS status;
     uint8_t     real_pk[crypto_box_PUBLICKEYBYTES];
 
     int         toxconn_id;
@@ -116,9 +115,11 @@ struct MDevice {
 
     Tox_Connections *dev_conns;
 
-    Device          *device;
+    Device          *devices;
+    uint32_t        devices_count;
 
-    uint32_t        device_count;
+    uint8_t         (*removed_devices)[crypto_box_PUBLICKEYBYTES];
+    uint32_t        removed_devices_count;
 
     uint8_t status;
 };
@@ -133,6 +134,9 @@ MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error);
 
 /* TODO DOCUMENT THIS FXN */
 int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk);
+
+/* Removes a device and adds it to the removed_devices blacklist */
+int mdev_remove_device(Tox* tox, uint32_t device_num);
 
 /* Return size of the mdev data (for saving) */
 size_t mdev_size(const Tox *tox);

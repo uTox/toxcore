@@ -38,24 +38,41 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 static int realloc_mdev_list(MDevice *dev, uint32_t num)
 {
     if (num == 0) {
-        free(dev->device);
-        dev->device = NULL;
+        free(dev->devices);
+        dev->devices = NULL;
         return 0;
     }
 
-    Device *new_dev_list = realloc(dev->device, num * sizeof(Device));
+    Device *new_dev_list = realloc(dev->devices, num * sizeof(Device));
 
     if (new_dev_list == NULL)
         return -1;
 
-    dev->device = new_dev_list;
+    dev->devices = new_dev_list;
+    return 0;
+}
+
+static int realloc_mdev_removed_list(MDevice *dev, uint32_t num)
+{
+    if (num == 0) {
+        free(dev->removed_devices);
+        dev->removed_devices = NULL;
+        return 0;
+    }
+
+    uint8_t (*removed_devices)[] = realloc(dev->removed_devices, num * crypto_box_PUBLICKEYBYTES);
+
+    if (removed_devices == NULL)
+        return -1;
+
+    dev->removed_devices = removed_devices;
     return 0;
 }
 
 static uint8_t mdev_device_not_valid(const MDevice *dev, uint32_t dev_num)
 {
-    if (dev_num < dev->device_count) {
-        if (dev->device[dev_num].status > MDEV_PENDING) {
+    if (dev_num < dev->devices_count) {
+        if (dev->devices[dev_num].status > MDEV_PENDING) {
             return 0;
         }
     }
@@ -71,7 +88,7 @@ static int send_online_packet(Tox *tox, int32_t dev_num, int32_t unused)
 
     uint8_t packet = PACKET_ID_ONLINE;
     return write_cryptpacket(tox->net_crypto,
-                             toxconn_crypt_connection_id(tox->mdev->dev_conns, tox->mdev->device[dev_num].toxconn_id),
+                             toxconn_crypt_connection_id(tox->mdev->dev_conns, tox->mdev->devices[dev_num].toxconn_id),
                              &packet, sizeof(packet), 0) != -1;
 }
 
@@ -82,11 +99,11 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
 static int32_t init_new_device_self(Tox *tox, const uint8_t *real_pk, uint8_t status)
 {
     /* Resize the friend list if necessary. */
-    if (realloc_mdev_list(tox->mdev, tox->mdev->device_count + 1) != 0) {
+    if (realloc_mdev_list(tox->mdev, tox->mdev->devices_count + 1) != 0) {
         return FAERR_NOMEM;
     }
 
-    memset(&(tox->mdev->device[tox->mdev->device_count]), 0, sizeof(Device));
+    memset(&(tox->mdev->devices[tox->mdev->devices_count]), 0, sizeof(Device));
 
     int devconn_id = new_tox_conn(tox->mdev->dev_conns, real_pk);
 
@@ -96,12 +113,12 @@ static int32_t init_new_device_self(Tox *tox, const uint8_t *real_pk, uint8_t st
 
     uint32_t i;
 
-    for (i = 0; i <= tox->mdev->device_count; ++i) {
-        if (tox->mdev->device[i].status == NO_MDEV) {
-            tox->mdev->device[i].status = status;
-            tox->mdev->device[i].toxconn_id = devconn_id;
+    for (i = 0; i <= tox->mdev->devices_count; ++i) {
+        if (tox->mdev->devices[i].status == NO_MDEV) {
+            tox->mdev->devices[i].status = status;
+            tox->mdev->devices[i].toxconn_id = devconn_id;
 
-            id_copy(tox->mdev->device[i].real_pk, real_pk);
+            id_copy(tox->mdev->devices[i].real_pk, real_pk);
 
             toxconn_set_callbacks(tox->mdev->dev_conns,
                                   devconn_id,
@@ -113,12 +130,12 @@ static int32_t init_new_device_self(Tox *tox, const uint8_t *real_pk, uint8_t st
                                   i,  /* device number */
                                   0); /* sub_device number always 0 for mdevice, */
 
-            if (tox->mdev->device_count == i) {
-                ++tox->mdev->device_count;
+            if (tox->mdev->devices_count == i) {
+                ++tox->mdev->devices_count;
             }
 
             if (toxconn_is_connected(tox->mdev->dev_conns, devconn_id) == TOXCONN_STATUS_CONNECTED) {
-                tox->mdev->device[i].status = MDEV_ONLINE;
+                tox->mdev->devices[i].status = MDEV_ONLINE;
                 send_online_packet(tox, i, 0);
             }
 
@@ -133,7 +150,7 @@ static int32_t init_new_device_self(Tox *tox, const uint8_t *real_pk, uint8_t st
 
 static void set_mdevice_status(MDevice *mdev, uint32_t dev_num, MDEV_STATUS status)
 {
-    mdev->device[dev_num].status = status;
+    mdev->devices[dev_num].status = status;
 
     if (status == MDEV_CONFIRMED) {
 
@@ -165,7 +182,7 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
     uint8_t *data = pkt + 1;
     uint32_t data_length = len - 1;
 
-    if (mdev->device[dev_num].status != MDEV_ONLINE) {
+    if (mdev->devices[dev_num].status != MDEV_ONLINE) {
         if (packet_id == PACKET_ID_ONLINE && len == 1) {
             set_mdevice_status(mdev, dev_num, MDEV_ONLINE);
             send_online_packet(tox, dev_num, 0);
@@ -261,7 +278,7 @@ void kill_multidevice(MDevice *dev)
 
     uint32_t i;
 
-    free(dev->device);
+    free(dev->devices);
     free(dev);
 }
 
@@ -280,9 +297,9 @@ static int get_device_id(MDevice *dev, const uint8_t *real_pk)
 {
     uint32_t i;
 
-    for (i = 0; i < dev->device_count; ++i) {
-        if (dev->device[i].status > 0) {
-            if (id_equal(real_pk, dev->device[i].real_pk)) {
+    for (i = 0; i < dev->devices_count; ++i) {
+        if (dev->devices[i].status > 0) {
+            if (id_equal(real_pk, dev->devices[i].real_pk)) {
                 return i;
             }
         }
@@ -308,7 +325,7 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
     int32_t dev_id = get_device_id(tox->mdev, real_pk);
 
     if (dev_id != -1) {
-        if (tox->mdev->device[dev_id].status >= FRIEND_CONFIRMED) {
+        if (tox->mdev->devices[dev_id].status >= FRIEND_CONFIRMED) {
             printf("Dev ID Already exists in list...\n");
             return -1;
         }
@@ -322,8 +339,8 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
 static size_t mdev_devices_size(MDevice* self)
 {
     size_t size = 0, devi;
-    for (devi = 0; devi < self->device_count; ++devi) {
-        Device* dev = &self->device[devi];
+    for (devi = 0; devi < self->devices_count; ++devi) {
+        Device* dev = &self->devices[devi];
         size +=   sizeof(dev->status)
                 + sizeof(dev->real_pk)
                 + sizeof(uint32_t)
@@ -341,11 +358,13 @@ size_t mdev_size(const Tox *tox)
     if (!tox->mdev)
         return 0;
 
-    return    save_subheader_size()                     /* Section header */
-            + sizeof(uint8_t)                           /* Version field */
-            + sizeof(tox->mdev->status)                 /* Status */
-            + sizeof(tox->mdev->device_count)           /* Device count */
-            + mdev_devices_size(tox->mdev)              /* Device data */
+    return    save_subheader_size()                                         /* Section header */
+            + sizeof(uint8_t)                                               /* Version field */
+            + sizeof(tox->mdev->status)                                     /* Status */
+            + sizeof(tox->mdev->devices_count)                              /* Device count */
+            + mdev_devices_size(tox->mdev)                                  /* Device data */
+            + sizeof(tox->mdev->removed_devices_count)                      /* Removed device count */
+            + tox->mdev->removed_devices_count*crypto_box_PUBLICKEYBYTES    /* Removed device data */
             ;
 }
 
@@ -358,12 +377,12 @@ uint8_t *mdev_save(const Tox *tox, uint8_t *data)
 
     *data++ = tox->mdev->status;
 
-    host_to_lendian32(data, tox->mdev->device_count);
+    host_to_lendian32(data, tox->mdev->devices_count);
     data += sizeof(uint32_t);
 
     size_t devi;
-    for (devi = 0; devi < tox->mdev->device_count; ++devi) {
-        Device* dev = &tox->mdev->device[devi];
+    for (devi = 0; devi < tox->mdev->devices_count; ++devi) {
+        Device* dev = &tox->mdev->devices[devi];
 
         *data++ = dev->status;
 
@@ -396,6 +415,13 @@ uint8_t *mdev_save(const Tox *tox, uint8_t *data)
         data += dev->remotename_length;
     }
 
+    host_to_lendian32(data, tox->mdev->removed_devices_count);
+    data += sizeof(uint32_t);
+
+    size_t size = tox->mdev->removed_devices_count * crypto_box_PUBLICKEYBYTES;
+    memcpy(data, tox->mdev->removed_devices, size);
+    data += size;
+
     return data;
 }
 
@@ -419,16 +445,16 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
 
         self->status = *data++;
 
-        lendian_to_host32(&self->device_count, data);
+        lendian_to_host32(&self->devices_count, data);
         data += sizeof(uint32_t);
 
-        realloc_mdev_list(self, self->device_count);
+        realloc_mdev_list(self, self->devices_count);
 
         /** TODO: Do we want to check MAX_DEVICE_COUNT here? */
 
         size_t devi;
-        for (devi = 0; devi < self->device_count; ++devi) {
-            Device* dev = &self->device[devi];
+        for (devi = 0; devi < self->devices_count; ++devi) {
+            Device* dev = &self->devices[devi];
 
             size_t required = sizeof(uint8_t)+sizeof(dev->real_pk)+sizeof(uint32_t)+sizeof(uint64_t)+sizeof(uint16_t);
             if (length < required)
@@ -471,14 +497,55 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
             memcpy(dev->remotename, data, dev->remotename_length);
             data += dev->remotename_length;
         }
+
+        if (length < sizeof(uint32_t))
+            goto fail_tooshort;
+        length -= sizeof(uint32_t);
+
+        lendian_to_host32(&self->removed_devices_count, data);
+        data += sizeof(uint32_t);
+
+        size_t removed_size = self->removed_devices_count * crypto_box_PUBLICKEYBYTES;
+        if (length < removed_size)
+            goto fail_tooshort;
+        length -= removed_size;
+        if (realloc_mdev_removed_list(self, self->removed_devices_count) < 0)
+            goto fail_alloc;
+        memcpy(self->removed_devices, data, removed_size);
+        data += removed_size;
+
+        if (length)
+            printf("mdev_save_read_sections_callback: Extra data ignored, save might be corrupted!\n");
     }
 
     return 0;
 
 fail_tooshort:
-    printf("Failed to read MDevice saved state, data truncated\n");
+    printf("Failed to read MDevice saved state, data is truncated!\n");
+fail_alloc:
     realloc_mdev_list(self, 0);
-    self->device_count = 0;
+    self->devices_count = 0;
     self->status = NO_MDEV;
+    return 0;
+}
+
+int mdev_remove_device(Tox *tox, uint32_t device_num)
+{
+    MDevice* self = tox->mdev;
+
+    if (device_num >= self->devices_count)
+        return -1;
+
+    realloc_mdev_removed_list(self, self->removed_devices_count+1);
+    memcpy(self->removed_devices[self->removed_devices_count], self->devices[device_num].real_pk,
+            sizeof(self->devices[device_num].real_pk));
+    self->removed_devices_count++;
+
+    off_t pos = device_num*sizeof(Device), new_pos = pos-sizeof(Device);
+    size_t size = (self->devices_count - device_num - 1)*sizeof(Device);
+    memmove(self->devices+new_pos, self->devices+pos, size);
+    realloc_mdev_list(self, self->devices_count-1); // Not a problem if it fails to shrink
+    self->devices_count--;
+
     return 0;
 }

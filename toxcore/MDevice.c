@@ -535,8 +535,6 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
 
         realloc_mdev_list(self, self->devices_count);
 
-        /** TODO: Do we want to check MAX_DEVICE_COUNT here? */
-
         size_t devi;
         for (devi = 0; devi < self->devices_count; ++devi) {
             Device* dev = &self->devices[devi];

@@ -85,12 +85,45 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 #define MDEV_CALLBACK_INDEX 0
 
 typedef enum {
+    MDEV_NULL_PKT,
+
+    MDEV_SYNC_META,
+
+    MDEV_SYNC_SELF,
+    MDEV_SYNC_SELF_NAME,
+    MDEV_SYNC_SELF_MSG,
+    MDEV_SYNC_SELF_STATUS,
+
+    MDEV_SYNC_FRIEND,
+    MDEV_SYNC_FRIEND_COUNT,
+    MDEV_SYNC_FRIEND_ADD,
+    MDEV_SYNC_FRIEND_REMOVE,
+
+    MDEV_SYNC_DEVICE,
+    MDEV_SYNC_DEVICE_COUNT,
+    MDEV_SYNC_DEVICE_ADD,
+    MDEV_SYNC_DEVICE_REMOVE,
+
+    MDEV_SYNC_MESSAGES,
+
+    MDEV_SYNC_NOTHING,
+
+} MDEV_PACKET_TYPE;
+
+typedef enum {
     NO_MDEV,
     MDEV_PENDING,
     MDEV_CONFIRMED,
     MDEV_ONLINE,
 
 } MDEV_STATUS;
+
+typedef struct MDevice_Options {
+    bool        enable_high_security; /* TODO Unsupported feature */
+
+    bool        send_messages;
+
+} MDevice_Options;
 
 typedef struct {
     MDEV_STATUS status; //0 no device, 1-3 device confimed, 4-5 device is blocked
@@ -121,6 +154,14 @@ struct MDevice {
     uint32_t        device_count;
 
     uint8_t status;
+
+    /* Callbacks */
+    void (*self_name_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
+    void *self_name_change_userdata;
+
+
+
+    MDevice_Options options;
 };
 
 typedef struct Tox Tox;

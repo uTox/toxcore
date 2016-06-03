@@ -230,6 +230,32 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
     return 0;
 }
 
+
+/******************************************************************************
+ ******** Multi-device send data fxns                                  ********
+ ******************************************************************************/
+void mdev_send_message_generic(tox, friend_number, type, message, length)
+{
+    return;
+}
+
+
+/******************************************************************************
+ ******** Multi-device set callbacks                                   ********
+ ******************************************************************************/
+void mdev_callback_self_name_change(Tox *tox,
+                                   void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),
+                                   void *userdata)
+{
+    tox->mdev->self_name_change = function;
+    tox->mdev->self_name_change_userdata = userdata;
+}
+
+
+/******************************************************************************
+ ******** Multi-device init, exit fxns                                 ********
+ ******************************************************************************/
+
 /* TODO replace the options here with our own! */
 MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error)
 {

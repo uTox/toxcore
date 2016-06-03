@@ -398,6 +398,12 @@ struct Tox_Options {
 
     bool enable_groupchats;
 
+
+    /**
+     * Send a copy of every message to a friend, to all connected devices.
+     */
+    bool send_message_to_devices;
+
     /**
      * The type of socket to create.
      *
@@ -1128,6 +1134,23 @@ size_t tox_self_get_name_size(const Tox *tox);
  *   If this parameter is NULL, the function has no effect.
  */
 void tox_self_get_name(const Tox *tox, uint8_t *name);
+
+/**
+ * @param device_number The number of the device sending the name change.
+ * @param name A byte array containing the same data as
+ *   tox_self_get_name would write to its `name` parameter.
+ * @param len A value equal to the return value of
+ *   tox_self_get_name_size.
+ */
+typedef void tox_mdev_self_name_cb(Tox *tox, uint32_t device_number, const uint8_t *name, size_t len, void *user_data);
+
+/**
+ * Set the callback for the `change_self_name` set by other device event. Pass NULL to unset.
+ *
+ * This event is triggered when a remote device changes the user's name.
+ */
+void tox_callback_mdev_self_name(Tox *tox, tox_mdev_self_name_cb *callback, void *user_data);
+
 
 /**
  * Set the client's status message.

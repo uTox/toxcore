@@ -140,7 +140,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
 
     Messenger_Options    m_options = {0};
-    // MDevice_Options   mdev_options = {0};
+    MDevice_Options   mdev_options = {0};
 
     _Bool load_savedata_sk = 0, load_savedata_tox = 0;
 
@@ -180,6 +180,8 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         m_options.port_range[0]     = options->start_port;
         m_options.port_range[1]     = options->end_port;
         m_options.tcp_server_port   = options->tcp_port;
+
+        mdev_options.send_messages  = options->send_message_to_devices;
 
         switch (options->proxy_type) {
             case TOX_PROXY_TYPE_HTTP:
@@ -564,6 +566,11 @@ void tox_self_get_name(const Tox *tox, uint8_t *name)
         const Messenger *m = tox->m;
         getself_name(m, name);
     }
+}
+
+void tox_callback_mdev_self_name(Tox *tox, tox_mdev_self_name_cb *function, void *user_data)
+{
+    mdev_callback_self_name_change(tox, function, user_data);
 }
 
 bool tox_self_set_status_message(Tox *tox, const uint8_t *status, size_t length, TOX_ERR_SET_INFO *error)
@@ -994,6 +1001,14 @@ uint32_t tox_friend_send_message(Tox *tox, uint32_t friend_number, TOX_MESSAGE_T
 
     uint32_t message_id = 0;
     set_message_error(m_send_message_generic(tox, friend_number, type, message, length, &message_id), error);
+
+    if (tox->mdev && 0) { /* && 0 because friend numbers have to by insync... */
+        if (tox->mdev->options.send_messages) {
+            mdev_send_message_generic(tox, friend_number, type, message, length);
+        }
+    }
+
+
     return message_id;
 }
 

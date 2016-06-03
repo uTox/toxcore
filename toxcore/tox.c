@@ -30,6 +30,7 @@
 #include "group.h"
 #include "logger.h"
 #include "save.h"
+#include "util.h"
 
 #include "../toxencryptsave/defines.h"
 
@@ -309,6 +310,8 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     } else {
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_OK);
     }
+
+    tox->uptime = unix_time();
 
     return tox;
 }

@@ -583,6 +583,8 @@ struct Tox {
     Onion           *onion;
     Onion_Announce  *onion_a;
     Onion_Client    *onion_c;
+
+    uint64_t        uptime;
 };
 
 

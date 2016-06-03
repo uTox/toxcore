@@ -55,7 +55,7 @@ static int realloc_mdev_list(MDevice *dev, uint32_t num)
 static uint8_t mdev_device_not_valid(const MDevice *dev, uint32_t dev_num)
 {
     if (dev_num < dev->device_count) {
-        if (dev->device[dev_num].status > MDEV_OK) {
+        if (dev->device[dev_num].status > MDEV_PENDING) {
             return 0;
         }
     }
@@ -131,6 +131,17 @@ static int32_t init_new_device_self(Tox *tox, const uint8_t *real_pk, uint8_t st
     return FAERR_NOMEM;
 }
 
+static void set_mdevice_status(MDevice *mdev, uint32_t dev_num, MDEV_STATUS status)
+{
+    mdev->device[dev_num].status = status;
+
+    if (status == MDEV_CONFIRMED) {
+
+    } else if (status == MDEV_ONLINE) {
+
+    }
+}
+
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status)
 {
     Tox *tox = object;
@@ -139,10 +150,75 @@ static int handle_status(void *object, int dev_num, int device_id, uint8_t statu
 }
 
 
-static int handle_packet(void *object, int dev_num, int device_id, uint8_t *temp, uint16_t len)
+static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt, uint16_t len)
 {
-    Tox *tox = object;
-    printf("handle_packet MDEV dev_num %i // dev_id %i // pkt %u // length %u \n", dev_num, device_id, temp[0], len);
+    printf("handle_packet MDEV dev_num %i // dev_id %i // pkt %u // length %u \n", dev_num, device_id, pkt[0], len);
+
+    if (len == 0) {
+        return -1;
+    }
+
+    Tox      *tox = object;
+    MDevice *mdev = tox->mdev;
+
+    uint8_t packet_id = pkt[0];
+    uint8_t *data = pkt + 1;
+    uint32_t data_length = len - 1;
+
+    if (mdev->device[dev_num].status != MDEV_ONLINE) {
+        if (packet_id == PACKET_ID_ONLINE && len == 1) {
+            set_mdevice_status(mdev, dev_num, MDEV_ONLINE);
+            send_online_packet(tox, dev_num, 0);
+        } else {
+            return -1;
+        }
+    }
+
+    switch (packet_id) {
+        case PACKET_ID_OFFLINE: {
+            if (data_length != 0)
+                break;
+
+            set_mdevice_status(mdev, dev_num, MDEV_CONFIRMED);
+            break;
+        }
+
+        case PACKET_ID_NICKNAME: {
+            if (data_length > MAX_NAME_LENGTH)
+                break;
+
+            break;
+        }
+
+        case PACKET_ID_STATUSMESSAGE: {
+            if (data_length > MAX_STATUSMESSAGE_LENGTH)
+                break;
+
+            break;
+        }
+
+        case PACKET_ID_USERSTATUS: {
+            if (data_length != 1)
+                break;
+
+            break;
+        }
+
+        case PACKET_ID_MESSAGE:
+        case PACKET_ID_ACTION: {
+            if (data_length == 0)
+                break;
+
+            break;
+        }
+
+
+
+        default: {
+            break;
+        }
+    }
+
     return 0;
 }
 

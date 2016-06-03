@@ -86,12 +86,7 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 
 typedef enum {
     NO_MDEV,
-    /* Device is blocked */
-    MDEV_REMOVED,
-    MDEV_REFUSED,
     MDEV_PENDING,
-    /* Device is active */
-    MDEV_OK,
     MDEV_CONFIRMED,
     MDEV_ONLINE,
 

@@ -139,4 +139,13 @@ MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error);
 /* TODO DOCUMENT THIS FXN */
 int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk);
 
+/* Return size of the mdev data (for saving) */
+size_t mdev_size(const Tox *tox);
+
+/* Save the mdev in data of size mdev_size(). */
+uint8_t *mdev_save(const Tox *tox, uint8_t *data);
+
+/* Loads the MDevice data from the sections of the saved state */
+int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type);
+
 #endif

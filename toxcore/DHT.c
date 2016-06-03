@@ -40,6 +40,7 @@
 #include "LAN_discovery.h"
 #include "misc_tools.h"
 #include "util.h"
+#include "save.h"
 
 /* The timeout after which a node is discarded completely. */
 #define KILL_NODE_TIMEOUT (BAD_NODE_TIMEOUT + PING_INTERVAL)
@@ -2144,16 +2145,6 @@ uint32_t DHT_size(const DHT *dht)
     return size32 + sizesubhead + pack_nodes(data, sizeof(Node_format) * num, clients, num);
 }
 
-static uint8_t *z_state_save_subheader(uint8_t *data, uint32_t len, uint16_t type)
-{
-    host_to_lendian32(data, len);
-    data += sizeof(uint32_t);
-    host_to_lendian32(data, (host_tolendian16(DHT_STATE_COOKIE_TYPE) << 16) | host_tolendian16(type));
-    data += sizeof(uint32_t);
-    return data;
-}
-
-
 /* Save the DHT in data where data is an array of size DHT_size(). */
 void DHT_save(DHT *dht, uint8_t *data)
 {
@@ -2165,12 +2156,13 @@ void DHT_save(DHT *dht, uint8_t *data)
     uint8_t *old_data = data;
 
     /* get right offset. we write the actual header later. */
-    data = z_state_save_subheader(data, 0, 0);
+    data = save_write_subheader(data, 0, 0, DHT_STATE_COOKIE_TYPE);
 
     Node_format clients[MAX_SAVED_V4_DHT_NODES + MAX_SAVED_V6_DHT_NODES];
 
     num = randfriends_nodes(dht, clients, MAX_SAVED_V4_DHT_NODES + MAX_SAVED_V6_DHT_NODES);
-    z_state_save_subheader(old_data, pack_nodes(data, sizeof(Node_format) * num, clients, num), DHT_STATE_TYPE_NODES);
+    save_write_subheader(old_data, pack_nodes(data, sizeof(Node_format) * num, clients, num),
+                         DHT_STATE_TYPE_NODES, DHT_STATE_COOKIE_TYPE);
 }
 
 /* Bootstrap from this number of nodes every time DHT_connect_after_load() is called */
@@ -2256,7 +2248,7 @@ int DHT_load(DHT *dht, const uint8_t *data, uint32_t length)
         lendian_to_host32(&data32, data);
 
         if (data32 == DHT_STATE_COOKIE_GLOBAL)
-            return load_state(dht_load_state_callback, dht, data + cookie_len,
+            return save_read_sections(dht_load_state_callback, dht, data + cookie_len,
                               length - cookie_len, DHT_STATE_COOKIE_TYPE);
     }
 

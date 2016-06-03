@@ -337,7 +337,7 @@ bool toxav_answer(ToxAV *av, uint32_t friend_number, uint32_t audio_bit_rate, ui
 
     TOXAV_ERR_ANSWER rc = TOXAV_ERR_ANSWER_OK;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_ANSWER_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -392,7 +392,7 @@ bool toxav_call_control(ToxAV *av, uint32_t friend_number, TOXAV_CALL_CONTROL co
     pthread_mutex_lock(av->mutex);
     TOXAV_ERR_CALL_CONTROL rc = TOXAV_ERR_CALL_CONTROL_OK;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_CALL_CONTROL_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -542,7 +542,7 @@ bool toxav_bit_rate_set(ToxAV *av, uint32_t friend_number, int32_t audio_bit_rat
     TOXAV_ERR_BIT_RATE_SET rc = TOXAV_ERR_BIT_RATE_SET_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_BIT_RATE_SET_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -665,7 +665,7 @@ bool toxav_audio_send_frame(ToxAV *av, uint32_t friend_number, const int16_t *pc
     TOXAV_ERR_SEND_FRAME rc = TOXAV_ERR_SEND_FRAME_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_SEND_FRAME_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -749,7 +749,7 @@ bool toxav_video_send_frame(ToxAV *av, uint32_t friend_number, uint16_t width, u
     TOXAV_ERR_SEND_FRAME rc = TOXAV_ERR_SEND_FRAME_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_SEND_FRAME_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -1033,12 +1033,12 @@ ToxAVCall *call_new(ToxAV *av, uint32_t friend_number, TOXAV_ERR_CALL *error)
     TOXAV_ERR_CALL rc = TOXAV_ERR_CALL_OK;
     ToxAVCall *call = NULL;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_CALL_FRIEND_NOT_FOUND;
         goto END;
     }
 
-    if (m_get_friend_connectionstatus(av->m, friend_number) < 1) {
+    if (m_get_friend_connectionstatus(av->m->tox, friend_number) < 1) {
         rc = TOXAV_ERR_CALL_FRIEND_NOT_CONNECTED;
         goto END;
     }

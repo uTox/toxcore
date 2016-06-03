@@ -29,6 +29,7 @@
 #include "MDevice.h"
 #include "group.h"
 #include "logger.h"
+#include "save.h"
 
 #include "../toxencryptsave/defines.h"
 
@@ -277,7 +278,6 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     if (!m) {
         return NULL;
     }
-    m->tox = tox;
     tox->m = m;
 
     MDevice *mdev = new_mdevice(tox, &m_options, &m_error);
@@ -301,7 +301,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
-    if (load_savedata_tox && messenger_load(tox, options->savedata_data, options->savedata_length) == -1) {
+    if (load_savedata_tox && save_load_from_data(tox, options->savedata_data, options->savedata_length) == -1) {
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_LOAD_BAD_FORMAT);
     } else if (load_savedata_sk) {
         load_secret_key(tox->net_crypto, options->savedata_data);
@@ -322,14 +322,12 @@ void tox_kill(Tox *tox)
 
 size_t tox_get_savedata_size(const Tox *tox)
 {
-    const Messenger *m = tox->m;
-    return messenger_size(tox);
+    return save_get_savedata_size(tox);
 }
 
 void tox_get_savedata(const Tox *tox, uint8_t *data)
 {
-    if (data)
-        messenger_save(tox, data);
+    save_get_savedata(tox, data);
 }
 
 bool tox_bootstrap(Tox *tox, const char *address, uint16_t port, const uint8_t *public_key, TOX_ERR_BOOTSTRAP *error)
@@ -510,14 +508,12 @@ bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *e
 
 void tox_self_set_nospam(Tox *tox, uint32_t nospam)
 {
-    Messenger *m = tox->m;
-    set_nospam(&(m->fr), nospam);
+    set_nospam(tox->net_crypto, nospam);
 }
 
 uint32_t tox_self_get_nospam(const Tox *tox)
 {
-    const Messenger *m = tox->m;
-    return get_nospam(&(m->fr));
+    return get_nospam(tox->net_crypto);
 }
 
 void tox_self_get_public_key(const Tox *tox, uint8_t *public_key)

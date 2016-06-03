@@ -50,11 +50,6 @@ uint16_t lendian_to_host16(uint16_t lendian);
 void host_to_lendian32(uint8_t *dest,  uint32_t num);
 void lendian_to_host32(uint32_t *dest, const uint8_t *lendian);
 
-/* state load/save */
-typedef int (*load_state_callback_func)(void *outer, const uint8_t *data, uint32_t len, uint16_t type);
-int load_state(load_state_callback_func load_state_callback, void *outer,
-               const uint8_t *data, uint32_t length, uint16_t cookie_inner);
-
 /* Returns -1 if failed or 0 if success */
 int create_recursive_mutex(pthread_mutex_t *mutex);
 

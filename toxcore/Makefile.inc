@@ -50,6 +50,8 @@ libtoxcore_la_SOURCES = ../toxcore/DHT.h \
                         ../toxcore/TCP_connection.c \
                         ../toxcore/list.c \
                         ../toxcore/list.h \
+                        ../toxcore/save.h \
+                        ../toxcore/save.c \
                         ../toxcore/misc_tools.h \
                         ../toxcore/tox_old_code.h
 

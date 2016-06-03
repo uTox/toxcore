@@ -6,6 +6,9 @@
 
 #include "MDevice.h"
 #include "util.h"
+#include "save.h"
+#include "assert.h"
+#include <limits.h>
 
 uint32_t toxmd_version_major(void)
 {
@@ -240,3 +243,127 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
     return ret;
 }
 
+static size_t mdev_devices_size(MDevice* self)
+{
+    size_t size = 0, devi;
+    for (devi = 0; devi < self->device_count; ++devi) {
+        Device* dev = &self->device[devi];
+        size +=   sizeof(dev->status)
+                + sizeof(dev->real_pk)
+                + sizeof(uint32_t)
+                + sizeof(dev->last_seen_time)
+                + dev->localname_length
+                + dev->remotename_length;
+    }
+    return size;
+}
+
+size_t mdev_size(const Tox *tox)
+{
+    if (!tox->mdev)
+        return 0;
+
+    return    save_subheader_size()                     /* Section header */
+            + sizeof(uint8_t)                           /* Version field */
+            + sizeof(tox->mdev->status)                 /* Status */
+            + sizeof(tox->mdev->device_count)           /* Device count */
+            + mdev_devices_size(tox->mdev)              /* Device data */
+            ;
+}
+
+uint8_t *mdev_save(const Tox *tox, uint8_t *data)
+{
+    size_t len = mdev_size(tox) - save_subheader_size();
+    data = save_write_subheader(data, len, SAVE_STATE_TYPE_MDEVICE, SAVE_STATE_COOKIE_TYPE);
+
+    *data++ = 1; /* Current version of the on-disk format */
+
+    *data++ = tox->mdev->status;
+
+    host_to_lendian32(data, tox->mdev->device_count);
+    data += sizeof(uint32_t);
+
+    size_t devi;
+    for (devi = 0; devi < tox->mdev->device_count; ++devi) {
+        Device* dev = &tox->mdev->device[devi];
+
+        *data++ = dev->status;
+
+        memcpy(data, dev->real_pk, sizeof(dev->real_pk));
+        data += sizeof(dev->real_pk);
+
+        assert(dev->toxconn_id >= -1 /* Since toxconn_id can be -1, we do +1 to get a portable, saveable unsigned */
+               && dev->toxconn_id < UINT32_MAX /* We'd wrap to 0 otherwise */
+               && dev->toxconn_id < INT_MAX); /* Doing +1 would be UB otherwise */
+        uint32_t toxconn_id_packed = (uint32_t)(dev->toxconn_id + 1);
+        host_to_lendian32(data, toxconn_id_packed);
+        data += sizeof(uint32_t);
+
+        uint8_t last_seen_time[sizeof(uint64_t)];
+        memcpy(last_seen_time, &dev->last_seen_time, sizeof(uint64_t));
+        host_to_net(last_seen_time, sizeof(last_seen_time));
+        memcpy(data, last_seen_time, sizeof(last_seen_time));
+        data += sizeof(last_seen_time);
+
+        memcpy(data, dev->localname, dev->localname_length);
+        data += dev->localname_length;
+
+        memcpy(data, dev->remotename, dev->remotename_length);
+        data += dev->remotename_length;
+    }
+
+    return data;
+}
+
+int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type)
+{
+    if (type != SAVE_STATE_TYPE_MDEVICE)
+        return 0;
+
+    if (length < sizeof(uint8_t))
+        return -1;
+    uint8_t version = data[0];
+    data++;
+    length--;
+
+    MDevice* self = tox->mdev;
+
+    if (version == 1) {
+        self->status = *data++;
+
+        lendian_to_host32(&self->device_count, data);
+        data += sizeof(uint32_t);
+
+        /** TODO: Do we want to check MAX_DEVICE_COUNT here? */
+
+        size_t devi;
+        for (devi = 0; devi < self->device_count; ++devi) {
+            Device* dev = &self->device[devi];
+
+            dev->status = (MDEV_STATUS)*data++;
+
+            memcpy(dev->real_pk, data, sizeof(dev->real_pk));
+            data += sizeof(dev->real_pk);
+
+            uint32_t toxconn_id_packed;
+            lendian_to_host32(&toxconn_id_packed, data);
+            assert(toxconn_id_packed < INT_MAX);
+            dev->toxconn_id = (int)toxconn_id_packed - 1;
+            data += sizeof(uint32_t);
+
+            uint8_t last_seen_time[sizeof(uint64_t)];
+            memcpy(last_seen_time, data, sizeof(last_seen_time));
+            net_to_host(last_seen_time, sizeof(last_seen_time));
+            memcpy(&dev->last_seen_time, last_seen_time, sizeof(uint64_t));
+            data += sizeof(last_seen_time);
+
+            memcpy(dev->localname, data, dev->localname_length);
+            data += dev->localname_length;
+
+            memcpy(dev->remotename, data, dev->remotename_length);
+            data += dev->remotename_length;
+        }
+    }
+
+    return 0;
+}

@@ -157,7 +157,7 @@ typedef struct {
 
     uint16_t audio_sequnum;
 
-    void (*audio_data)(Messenger *m, int groupnumber, int peernumber, const int16_t *pcm, unsigned int samples,
+    void (*audio_data)(Tox *tox, int groupnumber, int peernumber, const int16_t *pcm, unsigned int samples,
                        uint8_t channels, unsigned int sample_rate, void *userdata);
     void *userdata;
 } Group_AV;
@@ -355,7 +355,7 @@ static int decode_audio_packet(Group_AV *group_av, Group_Peer_AV *peer_av, int g
     if (out_audio) {
 
         if (group_av->audio_data)
-            group_av->audio_data(group_av->g_c->m, groupnumber, friendgroupnumber, out_audio, out_audio_samples,
+            group_av->audio_data(group_av->g_c->tox, groupnumber, friendgroupnumber, out_audio, out_audio_samples,
                                  peer_av->decoder_channels, sample_rate, group_av->userdata);
 
         free(out_audio);
@@ -429,8 +429,7 @@ static int groupchat_enable_av(Group_Chats *g_c, int groupnumber, void (*audio_c
  * return group number on success.
  * return -1 on failure.
  */
-int add_av_groupchat(Group_Chats *g_c, void (*audio_callback)(Tox *, int, int, const int16_t *, unsigned int,
-                     uint8_t, unsigned int, void *), void *userdata)
+int add_av_groupchat(Group_Chats *g_c, audio_callback_t audio_callback, void *userdata)
 {
     int groupnumber = add_groupchat(g_c, GROUPCHAT_TYPE_AV);
 
@@ -452,8 +451,7 @@ int add_av_groupchat(Group_Chats *g_c, void (*audio_callback)(Tox *, int, int, c
  * returns -1 on failure.
  */
 int join_av_groupchat(Group_Chats *g_c, int32_t friendnumber, const uint8_t *data, uint16_t length,
-                      void (*audio_callback)(Tox *, int, int, const int16_t *, unsigned int, uint8_t, unsigned int, void *),
-                      void *userdata)
+                      audio_callback_t audio_callback, void *userdata)
 {
     int groupnumber = join_groupchat(g_c, friendnumber, GROUPCHAT_TYPE_AV, data, length);
 

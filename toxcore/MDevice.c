@@ -134,7 +134,7 @@ static int32_t init_new_device_self(Tox *tox, const uint8_t *real_pk, uint8_t st
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status)
 {
     Tox *tox = object;
-    printf("handle_status MDEV\n");
+    printf("handle_status MDEV dev_num %i || dev_id %i || status %u \n", dev_num, device_id, status);
     return 0;
 }
 
@@ -142,7 +142,7 @@ static int handle_status(void *object, int dev_num, int device_id, uint8_t statu
 static int handle_packet(void *object, int dev_num, int device_id, uint8_t *temp, uint16_t len)
 {
     Tox *tox = object;
-    printf("handle_packet MDEV\n");
+    printf("handle_packet MDEV dev_num %i // dev_id %i // pkt %u // length %u \n", dev_num, device_id, temp[0], len);
     return 0;
 }
 

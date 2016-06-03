@@ -188,8 +188,9 @@ typedef struct {
     uint8_t cookie_length;
 } New_Connection;
 
-struct Net_Crypto {
+typedef struct Net_Crypto {
     uint32_t nospam;
+
     DHT *dht;
     TCP_Connections *tcp_c;
 
@@ -215,9 +216,7 @@ struct Net_Crypto {
     uint32_t current_sleep_time;
 
     BS_LIST ip_port_list;
-};
-
-typedef struct Net_Crypto Net_Crypto;
+} Net_Crypto;
 
 /* Set and get the nospam variable used to prevent one type of friend request spam. */
 void set_nospam(Net_Crypto *crypto, uint32_t num);

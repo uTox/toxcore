@@ -252,7 +252,9 @@ static size_t mdev_devices_size(MDevice* self)
                 + sizeof(dev->real_pk)
                 + sizeof(uint32_t)
                 + sizeof(dev->last_seen_time)
+                + sizeof(uint16_t)
                 + dev->localname_length
+                + sizeof(uint16_t)
                 + dev->remotename_length;
     }
     return size;
@@ -305,9 +307,15 @@ uint8_t *mdev_save(const Tox *tox, uint8_t *data)
         memcpy(data, last_seen_time, sizeof(last_seen_time));
         data += sizeof(last_seen_time);
 
+        uint16_t len = host_tolendian16(dev->localname_length);
+        memcpy(data, &len, sizeof(uint16_t));
+        data += sizeof(uint16_t);
         memcpy(data, dev->localname, dev->localname_length);
         data += dev->localname_length;
 
+        len = host_tolendian16(dev->remotename_length);
+        memcpy(data, &len, sizeof(uint16_t));
+        data += sizeof(uint16_t);
         memcpy(data, dev->remotename, dev->remotename_length);
         data += dev->remotename_length;
     }
@@ -329,6 +337,10 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
     MDevice* self = tox->mdev;
 
     if (version == 1) {
+        if (length < sizeof(uint8_t)+sizeof(uint32_t))
+            return 0;
+        length -= sizeof(uint8_t)+sizeof(uint32_t);
+
         self->status = *data++;
 
         lendian_to_host32(&self->device_count, data);
@@ -341,6 +353,11 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
         size_t devi;
         for (devi = 0; devi < self->device_count; ++devi) {
             Device* dev = &self->device[devi];
+
+            size_t required = sizeof(uint8_t)+sizeof(dev->real_pk)+sizeof(uint32_t)+sizeof(uint64_t)+sizeof(uint16_t);
+            if (length < required)
+                goto fail_tooshort;
+            length -= required;
 
             dev->status = (MDEV_STATUS)*data++;
 
@@ -359,13 +376,33 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
             memcpy(&dev->last_seen_time, last_seen_time, sizeof(uint64_t));
             data += sizeof(last_seen_time);
 
+            uint16_t len;
+            memcpy(&len, data, sizeof(uint16_t));
+            dev->localname_length = lendian_to_host16(len);
+            data += sizeof(uint16_t);
+            if (length < dev->localname_length + sizeof(uint16_t))
+                goto fail_tooshort;
+            length -= dev->localname_length + sizeof(uint16_t);
             memcpy(dev->localname, data, dev->localname_length);
             data += dev->localname_length;
 
+            memcpy(&len, data, sizeof(uint16_t));
+            dev->remotename_length = lendian_to_host16(len);
+            data += sizeof(uint16_t);
+            if (length < dev->remotename_length)
+                goto fail_tooshort;
+            length -= dev->remotename_length;
             memcpy(dev->remotename, data, dev->remotename_length);
             data += dev->remotename_length;
         }
     }
 
+    return 0;
+
+fail_tooshort:
+    printf("Failed to read MDevice saved state, data truncated\n");
+    realloc_mdev_list(self, 0);
+    self->device_count = 0;
+    self->status = NO_MDEV;
     return 0;
 }

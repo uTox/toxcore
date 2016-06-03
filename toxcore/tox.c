@@ -219,10 +219,6 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
 
     unsigned int m_error;
-    tox->mdev = new_mdevice(tox, &m_options, &m_error);
-    if (!tox->mdev) {
-        return NULL;
-    }
 
     unsigned int net_err = 0;
 
@@ -262,7 +258,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
-    tox->onion = new_onion(tox->dht);
+    tox->onion   = new_onion(tox->dht);
     tox->onion_a = new_onion_announce(tox->dht);
     tox->onion_c = new_onion_client(tox->net_crypto);
 
@@ -278,11 +274,21 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
 
     Messenger *m = new_messenger(tox, &m_options, &m_error);
-    tox->m = m;
+    if (!m) {
+        return NULL;
+    }
     m->tox = tox;
+    tox->m = m;
+
+    MDevice *mdev = new_mdevice(tox, &m_options, &m_error);
+    if (!mdev) {
+        return NULL;
+    }
+    mdev->tox = tox;
+    tox->mdev = mdev;
 
     if (!new_groupchats(tox)) {
-        kill_messenger(m);
+        kill_messenger(m); /* TODO messenger doesn't do everything anymore so we need to kill everything here instead */
 
         if (m_error == MESSENGER_ERROR_PORT) {
             SET_ERROR_PARAMETER(error, TOX_ERR_NEW_PORT_ALLOC);
@@ -482,6 +488,8 @@ bool tox_self_add_device(Tox *tox, const uint8_t *public_key, TOX_ERR_DEVICE_ADD
     if (mdev_add_new_device_self(tox, public_key) != 0){
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
         return 0;
+    } else {
+        return 1;
     }
 }
 

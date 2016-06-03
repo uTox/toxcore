@@ -334,6 +334,8 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
         lendian_to_host32(&self->device_count, data);
         data += sizeof(uint32_t);
 
+        realloc_mdev_list(self, self->device_count);
+
         /** TODO: Do we want to check MAX_DEVICE_COUNT here? */
 
         size_t devi;

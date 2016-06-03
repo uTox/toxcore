@@ -29,6 +29,7 @@
 #include "MDevice.h"
 #include "group.h"
 #include "logger.h"
+#include "save.h"
 
 #include "../toxencryptsave/defines.h"
 
@@ -322,14 +323,12 @@ void tox_kill(Tox *tox)
 
 size_t tox_get_savedata_size(const Tox *tox)
 {
-    const Messenger *m = tox->m;
-    return messenger_size(tox);
+    return save_get_savedata_size(tox);
 }
 
 void tox_get_savedata(const Tox *tox, uint8_t *data)
 {
-    if (data)
-        messenger_save(tox, data);
+    save_get_savedata(tox, data);
 }
 
 bool tox_bootstrap(Tox *tox, const char *address, uint16_t port, const uint8_t *public_key, TOX_ERR_BOOTSTRAP *error)
@@ -510,14 +509,12 @@ bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *e
 
 void tox_self_set_nospam(Tox *tox, uint32_t nospam)
 {
-    Messenger *m = tox->m;
-    set_nospam(&(m->fr), nospam);
+    set_nospam(tox->net_crypto, nospam);
 }
 
 uint32_t tox_self_get_nospam(const Tox *tox)
 {
-    const Messenger *m = tox->m;
-    return get_nospam(&(m->fr));
+    return get_nospam(tox->net_crypto);
 }
 
 void tox_self_get_public_key(const Tox *tox, uint8_t *public_key)

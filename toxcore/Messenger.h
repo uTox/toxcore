@@ -806,7 +806,7 @@ uint32_t messenger_run_interval(const Tox *tox);
 uint32_t messenger_size(const Tox *tox);
 
 /* Save the messenger in data (must be allocated memory of size Messenger_size()) */
-void messenger_save(const Tox *tox, uint8_t *data);
+uint8_t *messenger_save(const Tox *tox, uint8_t *data);
 
 /* Load the messenger from data of size length. */
 int messenger_load(Tox *tox, const uint8_t *data, uint32_t length);

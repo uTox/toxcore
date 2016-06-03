@@ -157,6 +157,7 @@ typedef struct {
 
     uint16_t audio_sequnum;
 
+    /* TODO: FIXME: Messenger should probably be Tox*, there's a type mismatch */
     void (*audio_data)(Messenger *m, int groupnumber, int peernumber, const int16_t *pcm, unsigned int samples,
                        uint8_t channels, unsigned int sample_rate, void *userdata);
     void *userdata;

@@ -240,3 +240,17 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
     return ret;
 }
 
+
+size_t mdev_size(const Tox *tox)
+{
+    if (!tox->mdev)
+        return 0;
+
+    return 0;
+}
+
+uint8_t *mdev_save(const Tox *tox, uint8_t *data)
+{
+    /* TODO: */
+    return data;
+}

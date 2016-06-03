@@ -33,7 +33,7 @@
 #include "Messenger.h"
 #include "network.h"
 #include "util.h"
-
+#include "save.h"
 
 static void set_friend_status(Tox *tox, int32_t friendnumber, uint8_t status);
 static void set_device_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status);
@@ -145,7 +145,7 @@ static uint16_t address_checksum(const uint8_t *address, uint32_t len)
 void getaddress(const Tox *tox, uint8_t *address)
 {
     id_copy(address, tox->net_crypto->self_public_key);
-    uint32_t nospam = get_nospam(&(tox->m->fr));
+    uint32_t nospam = get_nospam(tox->net_crypto);
     memcpy(address + crypto_box_PUBLICKEYBYTES, &nospam, sizeof(nospam));
     uint16_t checksum = address_checksum(address, FRIEND_ADDRESS_SIZE - sizeof(checksum));
     memcpy(address + crypto_box_PUBLICKEYBYTES + sizeof(nospam), &checksum, sizeof(checksum));
@@ -1993,9 +1993,11 @@ Messenger *new_messenger(Tox* tox, Messenger_Options *options, unsigned int *err
         }
     }
 
+    m->tox = tox;
+    m->fr.crypto = tox->net_crypto;
     m->options = *options;
     friendreq_init(&(m->fr), m->fr_c);
-    set_nospam(&(m->fr), random_int());
+    set_nospam(m->tox->net_crypto, random_int());
     set_filter_function(&(m->fr), &friend_already_added, m);
 
     if (error)
@@ -2584,24 +2586,7 @@ void do_messenger(Tox *tox)
 #endif /* TOX_LOGGER */
 }
 
-/* new messenger format for load/save, more robust and forward compatible */
-
-#define MESSENGER_STATE_COOKIE_GLOBAL 0x15ed1b1f
-
-#define MESSENGER_STATE_COOKIE_TYPE      0x01ce
-#define MESSENGER_STATE_TYPE_NOSPAMKEYS    1
-#define MESSENGER_STATE_TYPE_DHT           2
-#define MESSENGER_STATE_TYPE_OLDFRIENDS    3    /* Deprecated by *_FRIENDS */
-#define MESSENGER_STATE_TYPE_NAME          4
-#define MESSENGER_STATE_TYPE_STATUSMESSAGE 5
-#define MESSENGER_STATE_TYPE_STATUS        6
-#define MESSENGER_STATE_TYPE_TCP_RELAY     10
-#define MESSENGER_STATE_TYPE_PATH_NODE     11
-#define MESSENGER_STATE_TYPE_FRIENDS       12
-#define MESSENGER_STATE_TYPE_END           255
-
 #define SAVED_FRIEND_REQUEST_SIZE 1024
-#define NUM_SAVED_PATH_NODES 8
 struct SAVED_FRIEND {
     uint8_t  status;
     uint8_t  device_status[MAX_DEVICE_COUNT];
@@ -2792,110 +2777,64 @@ static int friends_list_load(Tox *tox, const uint8_t *data, uint32_t length)
 /*  return size of the messenger data (for saving) */
 uint32_t messenger_size(const Tox *tox)
 {
+    if (!tox->m)
+        return 0;
+
     uint32_t size32 = sizeof(uint32_t), sizesubhead = size32 * 2;
-    return   size32 * 2                                      // global cookie
-             + sizesubhead + sizeof(uint32_t) + crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES
-             + sizesubhead + DHT_size(tox->dht)                  // DHT
-             + sizesubhead + saved_friendslist_size(tox->m)         // Friendlist itself.
+    return     sizesubhead + saved_friendslist_size(tox->m)         // Friendlist itself.
              + sizesubhead + tox->m->name_length                    // Own nickname.
              + sizesubhead + tox->m->statusmessage_length           // status message
-             + sizesubhead + 1                                 // status
+             + sizesubhead + 1                                      // status
              + sizesubhead + NUM_SAVED_TCP_RELAYS * packed_node_size(TCP_INET6) //TCP relays
-             + sizesubhead + NUM_SAVED_PATH_NODES * packed_node_size(TCP_INET6) //saved path nodes
-             + sizesubhead;
-}
-
-static uint8_t *z_state_save_subheader(uint8_t *data, uint32_t len, uint16_t type)
-{
-    host_to_lendian32(data, len);
-    data += sizeof(uint32_t);
-    host_to_lendian32(data, (host_tolendian16(MESSENGER_STATE_COOKIE_TYPE) << 16) | host_tolendian16(type));
-    data += sizeof(uint32_t);
-    return data;
+             ;
 }
 
 /* Save the messenger in data of size Messenger_size(). */
-void messenger_save(const Tox *tox, uint8_t *data)
+uint8_t *messenger_save(const Tox *tox, uint8_t *data)
 {
     memset(data, 0, messenger_size(tox));
 
     uint32_t len;
     uint16_t type;
-    uint32_t size32 = sizeof(uint32_t);
-
-    memset(data, 0, size32);
-    data += size32;
-    host_to_lendian32(data, MESSENGER_STATE_COOKIE_GLOBAL);
-    data += size32;
-
-#ifdef DEBUG
-    assert(sizeof(get_nospam(&(tox->m->fr))) == sizeof(uint32_t));
-#endif
-    len = size32 + crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES;
-    type = MESSENGER_STATE_TYPE_NOSPAMKEYS;
-    data = z_state_save_subheader(data, len, type);
-    *(uint32_t *)data = get_nospam(&(tox->m->fr));
-    save_keys(tox->net_crypto, data + size32);
-    data += len;
 
     len = saved_friendslist_size(tox->m);
-    type = MESSENGER_STATE_TYPE_FRIENDS;
-    data = z_state_save_subheader(data, len, type);
+    type = SAVE_STATE_TYPE_FRIENDS;
+    data = save_write_subheader(data, len, type, SAVE_STATE_COOKIE_TYPE);
     friends_list_save(tox, data);
     data += len;
 
     len = tox->m->name_length;
-    type = MESSENGER_STATE_TYPE_NAME;
-    data = z_state_save_subheader(data, len, type);
+    type = SAVE_STATE_TYPE_NAME;
+    data = save_write_subheader(data, len, type, SAVE_STATE_COOKIE_TYPE);
     memcpy(data, tox->m->name, len);
     data += len;
 
     len = tox->m->statusmessage_length;
-    type = MESSENGER_STATE_TYPE_STATUSMESSAGE;
-    data = z_state_save_subheader(data, len, type);
+    type = SAVE_STATE_TYPE_STATUSMESSAGE;
+    data = save_write_subheader(data, len, type, SAVE_STATE_COOKIE_TYPE);
     memcpy(data, tox->m->statusmessage, len);
     data += len;
 
     len = 1;
-    type = MESSENGER_STATE_TYPE_STATUS;
-    data = z_state_save_subheader(data, len, type);
+    type = SAVE_STATE_TYPE_STATUS;
+    data = save_write_subheader(data, len, type, SAVE_STATE_COOKIE_TYPE);
     *data = tox->m->userstatus;
     data += len;
 
-    len = DHT_size(tox->dht);
-    type = MESSENGER_STATE_TYPE_DHT;
-    data = z_state_save_subheader(data, len, type);
-    DHT_save(tox->dht, data);
-    data += len;
-
     Node_format relays[NUM_SAVED_TCP_RELAYS];
-    type = MESSENGER_STATE_TYPE_TCP_RELAY;
+    type = SAVE_STATE_TYPE_TCP_RELAY;
     uint8_t *temp_data = data;
-    data = z_state_save_subheader(temp_data, 0, type);
+    data = save_write_subheader(temp_data, 0, type, SAVE_STATE_COOKIE_TYPE);
     unsigned int num = copy_connected_tcp_relays(tox->net_crypto, relays, NUM_SAVED_TCP_RELAYS);
     int l = pack_nodes(data, NUM_SAVED_TCP_RELAYS * packed_node_size(TCP_INET6), relays, num);
 
     if (l > 0) {
         len = l;
-        data = z_state_save_subheader(temp_data, len, type);
+        data = save_write_subheader(temp_data, len, type, SAVE_STATE_COOKIE_TYPE);
         data += len;
     }
 
-    Node_format nodes[NUM_SAVED_PATH_NODES];
-    type = MESSENGER_STATE_TYPE_PATH_NODE;
-    temp_data = data;
-    data = z_state_save_subheader(data, 0, type);
-    memset(nodes, 0, sizeof(nodes));
-    num = onion_backup_nodes(tox->onion_c, nodes, NUM_SAVED_PATH_NODES);
-    l = pack_nodes(data, NUM_SAVED_PATH_NODES * packed_node_size(TCP_INET6), nodes, num);
-
-    if (l > 0) {
-        len = l;
-        data = z_state_save_subheader(temp_data, len, type);
-        data += len;
-    }
-
-    z_state_save_subheader(data, 0, MESSENGER_STATE_TYPE_END);
+    return data;
 }
 
 static int messenger_load_state_callback(void *outer, const uint8_t *data, uint32_t length, uint16_t type)
@@ -2903,9 +2842,9 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
     Tox *tox = outer;
 
     switch (type) {
-        case MESSENGER_STATE_TYPE_NOSPAMKEYS:
+        case SAVE_STATE_TYPE_NOSPAMKEYS:
             if (length == crypto_box_PUBLICKEYBYTES + crypto_box_SECRETKEYBYTES + sizeof(uint32_t)) {
-                set_nospam(&(tox->m->fr), *(uint32_t *)data);
+                set_nospam(tox->net_crypto, *(uint32_t *)data);
                 load_secret_key(tox->net_crypto, (&data[sizeof(uint32_t)]) + crypto_box_PUBLICKEYBYTES);
 
                 if (public_key_cmp((&data[sizeof(uint32_t)]), tox->net_crypto->self_public_key) != 0) {
@@ -2916,36 +2855,36 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
 
             break;
 
-        case MESSENGER_STATE_TYPE_DHT:
+        case SAVE_STATE_TYPE_DHT:
             DHT_load(tox->dht, data, length);
             break;
 
-        case MESSENGER_STATE_TYPE_OLDFRIENDS:
+        case SAVE_STATE_TYPE_OLDFRIENDS:
             oldfriends_list_load(tox->m, data, length);
             break;
 
-        case MESSENGER_STATE_TYPE_NAME:
+        case SAVE_STATE_TYPE_NAME:
             if ((length > 0) && (length <= MAX_NAME_LENGTH)) {
                 setname(tox->m, data, length);
             }
 
             break;
 
-        case MESSENGER_STATE_TYPE_STATUSMESSAGE:
+        case SAVE_STATE_TYPE_STATUSMESSAGE:
             if ((length > 0) && (length < MAX_STATUSMESSAGE_LENGTH)) {
                 m_set_statusmessage(tox, data, length);
             }
 
             break;
 
-        case MESSENGER_STATE_TYPE_STATUS:
+        case SAVE_STATE_TYPE_STATUS:
             if (length == 1) {
                 m_set_userstatus(tox, *data);
             }
 
             break;
 
-        case MESSENGER_STATE_TYPE_TCP_RELAY: {
+        case SAVE_STATE_TYPE_TCP_RELAY: {
             if (length == 0) {
                 break;
             }
@@ -2956,7 +2895,7 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
             break;
         }
 
-        case MESSENGER_STATE_TYPE_PATH_NODE: {
+        case SAVE_STATE_TYPE_PATH_NODE: {
             Node_format nodes[NUM_SAVED_PATH_NODES];
 
             if (length == 0) {
@@ -2972,11 +2911,11 @@ static int messenger_load_state_callback(void *outer, const uint8_t *data, uint3
             break;
         }
 
-        case MESSENGER_STATE_TYPE_FRIENDS:
+        case SAVE_STATE_TYPE_FRIENDS:
             friends_list_load(tox, data, length);
             break;
 
-        case MESSENGER_STATE_TYPE_END: {
+        case SAVE_STATE_TYPE_END: {
             if (length != 0) {
                 return -1;
             }
@@ -3009,9 +2948,9 @@ int messenger_load(Tox *tox, const uint8_t *data, uint32_t length)
     memcpy(data32, data, sizeof(uint32_t));
     lendian_to_host32(data32 + 1, data + sizeof(uint32_t));
 
-    if (!data32[0] && (data32[1] == MESSENGER_STATE_COOKIE_GLOBAL))
+    if (!data32[0] && (data32[1] == SAVE_STATE_COOKIE_GLOBAL))
         return load_state(messenger_load_state_callback, tox, data + cookie_len,
-                          length - cookie_len, MESSENGER_STATE_COOKIE_TYPE);
+                          length - cookie_len, SAVE_STATE_COOKIE_TYPE);
     else
         return -1;
 }

@@ -426,9 +426,8 @@ static size_t mdev_devices_size(MDevice* self)
     size_t size = 0, devi;
     for (devi = 0; devi < self->devices_count; ++devi) {
         Device* dev = &self->devices[devi];
-        size +=   sizeof(dev->status)
+        size +=   sizeof(uint8_t)
                 + sizeof(dev->real_pk)
-                + sizeof(uint32_t)
                 + sizeof(dev->last_seen_time)
                 + sizeof(uint16_t)
                 + dev->localname_length
@@ -473,13 +472,6 @@ uint8_t *mdev_save(const Tox *tox, uint8_t *data)
 
         memcpy(data, dev->real_pk, sizeof(dev->real_pk));
         data += sizeof(dev->real_pk);
-
-        assert(dev->toxconn_id >= -1 /* Since toxconn_id can be -1, we do +1 to get a portable, saveable unsigned */
-               && dev->toxconn_id < UINT32_MAX /* We'd wrap to 0 otherwise */
-               && dev->toxconn_id < INT_MAX); /* Doing +1 would be UB otherwise */
-        uint32_t toxconn_id_packed = (uint32_t)(dev->toxconn_id + 1);
-        host_to_lendian32(data, toxconn_id_packed);
-        data += sizeof(uint32_t);
 
         uint8_t last_seen_time[sizeof(uint64_t)];
         memcpy(last_seen_time, &dev->last_seen_time, sizeof(uint64_t));
@@ -530,30 +522,32 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
 
         self->status = *data++;
 
-        lendian_to_host32(&self->devices_count, data);
+        uint32_t devices_count;
+        lendian_to_host32(&devices_count, data);
+        self->devices_count = 0;
         data += sizeof(uint32_t);
 
-        realloc_mdev_list(self, self->devices_count);
-
         size_t devi;
-        for (devi = 0; devi < self->devices_count; ++devi) {
-            Device* dev = &self->devices[devi];
+        for (devi = 0; devi < devices_count; ++devi) {
+            uint8_t status;
+            uint8_t real_pk[crypto_box_PUBLICKEYBYTES];
 
-            size_t required = sizeof(uint8_t)+sizeof(dev->real_pk)+sizeof(uint32_t)+sizeof(uint64_t)+sizeof(uint16_t);
+            size_t required = sizeof(uint8_t)+sizeof(real_pk)+sizeof(uint64_t)+sizeof(uint16_t);
             if (length < required)
                 goto fail_tooshort;
             length -= required;
 
-            dev->status = (MDEV_STATUS)*data++;
+            status = (MDEV_STATUS)*data++;
 
-            memcpy(dev->real_pk, data, sizeof(dev->real_pk));
-            data += sizeof(dev->real_pk);
+            memcpy(real_pk, data, sizeof(real_pk));
+            data += sizeof(real_pk);
 
-            uint32_t toxconn_id_packed;
-            lendian_to_host32(&toxconn_id_packed, data);
-            assert(toxconn_id_packed < INT_MAX);
-            dev->toxconn_id = (int)toxconn_id_packed - 1;
-            data += sizeof(uint32_t);
+            if (mdev_add_new_device_self(tox, real_pk) < 0)
+                goto fail_generic;
+
+            Device* dev = &self->devices[devi];
+
+            dev->status = status;
 
             uint8_t last_seen_time[sizeof(uint64_t)];
             memcpy(last_seen_time, data, sizeof(last_seen_time));
@@ -593,7 +587,7 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
             goto fail_tooshort;
         length -= removed_size;
         if (realloc_mdev_removed_list(self, self->removed_devices_count) < 0)
-            goto fail_alloc;
+            goto fail_generic;
         memcpy(self->removed_devices, data, removed_size);
         data += removed_size;
 
@@ -605,7 +599,7 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
 
 fail_tooshort:
     printf("Failed to read MDevice saved state, data is truncated!\n");
-fail_alloc:
+fail_generic:
     realloc_mdev_list(self, 0);
     self->devices_count = 0;
     self->status = NO_MDEV;

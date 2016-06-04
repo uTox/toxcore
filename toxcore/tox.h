@@ -903,16 +903,15 @@ typedef enum TOX_ERR_DEVICE_ADD {
     TOX_ERR_DEVICE_ADD_NULL,
 
     /**
-     * The length of the friend request message exceeded
-     * TOX_MAX_FRIEND_REQUEST_LENGTH.
+     * The length of the name exceeded
+     * TOX_MAX_NAME_LENGTH.
      */
     TOX_ERR_DEVICE_ADD_TOO_LONG,
 
     /**
-     * The friend request message was empty. This, and the TOO_LONG code will
-     * never be returned from tox_friend_add_norequest.
+     * The friend address was not a valid address.
      */
-    TOX_ERR_DEVICE_ADD_NO_MESSAGE,
+    TOX_ERR_DEVICE_ADD_BAD_KEY,
 
     /**
      * The friend address belongs to the sending client.
@@ -920,25 +919,19 @@ typedef enum TOX_ERR_DEVICE_ADD {
     TOX_ERR_DEVICE_ADD_OWN_KEY,
 
     /**
-     * A friend request has already been sent, or the address belongs to a friend
-     * that is already on the friend list.
+     * The device has previously been removed and is permanently blacklisted.
      */
-    TOX_ERR_DEVICE_ADD_ALREADY_SENT,
+    TOX_ERR_DEVICE_ADD_BLACKLISTED,
 
     /**
-     * The friend address checksum failed.
+     * The device has already been added.
      */
-    TOX_ERR_DEVICE_ADD_BAD_CHECKSUM,
+    TOX_ERR_DEVICE_ADD_EXISTS,
 
     /**
-     * The friend was already there, but the nospam value was different.
+     * The device could not be added due to an internal, such as a memory allocation failure.
      */
-    TOX_ERR_DEVICE_ADD_SET_NEW_NOSPAM,
-
-    /**
-     * A memory allocation failed when trying to increase the friend list size.
-     */
-    TOX_ERR_DEVICE_ADD_MALLOC,
+    TOX_ERR_DEVICE_ADD_INTERNAL,
 
 } TOX_ERR_DEVICE_ADD;
 
@@ -962,6 +955,24 @@ typedef enum TOX_ERR_DEVICE_GET {
 
 } TOX_ERR_DEVICE_GET;
 
+typedef enum TOX_ERR_BLACKLISTED_DEVICE_GET {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_BLACKLISTED_DEVICE_GET_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_BLACKLISTED_DEVICE_GET_NULL,
+
+    /**
+     * The device does not exist
+     */
+    TOX_ERR_BLACKLISTED_DEVICE_GET_NODEV,
+
+} TOX_ERR_BLACKLISTED_DEVICE_GET;
 
 typedef enum TOX_ERR_DEVICE_DEL {
 
@@ -982,11 +993,33 @@ typedef enum TOX_ERR_DEVICE_DEL {
 
 } TOX_ERR_DEVICE_DEL;
 
+typedef enum TOX_DEVICE_STATUS {
+
+    /**
+     * You have added the device, but it has not accepted you back.
+     */
+    TOX_DEVICE_STATUS_PENDING,
+
+    /**
+     * The device has accepted to synchronize with you, but is not currently online.
+     */
+    TOX_DEVICE_STATUS_CONFIRMED,
+
+    /**
+     * The device has accepted to synchronize with you, and is online.
+     */
+    TOX_DEVICE_STATUS_ONLINE,
+
+} TOX_DEVICE_STATUS;
 
 /**
 * Add a device, if it adds you in return, you and it become associated
+* @param name User-friendly name of the device, may be NULL if length is 0
+* @param length Length of the name
+* @param address Public key part of the Tox ID of that device
 */
-bool tox_self_add_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_ADD *error);
+bool tox_self_add_device(Tox *tox, const uint8_t* name, size_t length,
+                         const uint8_t *address, TOX_ERR_DEVICE_ADD *error);
 
 /**
 * Returns the number of associated devices
@@ -994,15 +1027,29 @@ bool tox_self_add_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_ADD *e
 uint32_t tox_self_get_device_count(const Tox *tox);
 
 /**
-* Retreives the public-key of an associated device
+* Retreives the public-key, status and null-terminated name of an associated device
+* @param name A pointer to an array of MAX_NAME_LENGTH+1 bytes, optionally NULL
+* @param status Pointer to which the status will be written, optionally NULL
 */
-bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *public_key, TOX_ERR_DEVICE_GET *error);
+bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t* name, TOX_DEVICE_STATUS *status,
+                         uint8_t *public_key, TOX_ERR_DEVICE_GET *error);
+
+/**
+* Returns the number of permanently blacklisted devices
+*/
+uint32_t tox_self_get_blacklisted_device_count(const Tox *tox);
+
+/**
+* Retreives the public-key of a permanently blacklisted device
+*/
+bool tox_self_get_blacklisted_device(Tox *tox, uint32_t device_num, uint8_t *public_key,
+                                     TOX_ERR_BLACKLISTED_DEVICE_GET *error);
 
 /**
 * Permanently removes and blacklists an associated device
 * Use this function if the device was lost or stolen
 */
-bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *error);
+bool tox_self_delete_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_DEL *error);
 
 
 /*******************************************************************************

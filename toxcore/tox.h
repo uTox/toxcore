@@ -1124,6 +1124,23 @@ size_t tox_self_get_status_message_size(const Tox *tox);
 void tox_self_get_status_message(const Tox *tox, uint8_t *status_message);
 
 /**
+ * @param device_number The number of the device sending the status message change.
+ * @param status_message A byte array containing the same data as
+ *   tox_self_get_status_message would write to its `status_message` parameter.
+ * @param len A value equal to the return value of
+ *   tox_self_get_status_message_size.
+ */
+typedef void tox_mdev_self_status_message_cb(Tox *tox, uint32_t device_number,
+                                             const uint8_t *status_message, size_t len, void *user_data);
+
+/**
+ * Set the callback for the `change_self_status_message` set by other device event. Pass NULL to unset.
+ *
+ * This event is triggered when a remote device changes the user's status message.
+ */
+void tox_callback_mdev_self_status_message(Tox *tox, tox_mdev_self_status_message_cb *callback, void *user_data);
+
+/**
  * Set the client's user status.
  *
  * @param user_status One of the user statuses listed in the enumeration above.

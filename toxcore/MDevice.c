@@ -242,7 +242,30 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
 
                 }
 
+            } else if (data[0] == MDEV_SEND_STATUS) {
+                uint8_t *status        = data + 1;
+                size_t   status_length = data_length - 1;
+
+                if (data_length > MAX_NAME_LENGTH) {
+                    break;
+                }
+
+                if (status_length > MAX_STATUSMESSAGE_LENGTH) {
+                    break;
+                }
+
+                if (status_length) {
+                    memcpy(tox->m->statusmessage, status, status_length);
+                }
+
+                tox->m->statusmessage_length = status_length;
+
+                if (mdev->self_status_message_change) {
+                    mdev->self_status_message_change(tox, dev_num, status, status_length,
+                                                     mdev->self_status_message_change_userdata);
+                }
             }
+
             break;
         }
 
@@ -290,7 +313,7 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
 /******************************************************************************
  ******** Multi-device send data fxns                                  ********
  ******************************************************************************/
-bool mdev_sync_name_change(Tox *tox, uint8_t *name, size_t length)
+bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length)
 {
     uint8_t packet[length + 2];
 
@@ -309,8 +332,27 @@ bool mdev_sync_name_change(Tox *tox, uint8_t *name, size_t length)
     return 1;
 }
 
+bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t length)
+{
+    uint8_t packet[length + 2];
 
-void mdev_send_message_generic(tox, friend_number, type, message, length)
+    packet[0] = PACKET_ID_MDEV_SEND;
+    packet[1] = MDEV_SEND_STATUS;
+    memcpy(&packet[2], status, length);
+
+    if (tox->mdev->devices_count == 0) {
+        return 0;
+    }
+
+    for (int i = 0; i <= tox->mdev->devices_count; ++i) {
+        send_mdev_packet(tox, i, packet, length + 2);
+    }
+
+    return 1;
+}
+
+
+void mdev_send_message_generic(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYPE type, const uint8_t *message, size_t length)
 {
     return;
 }
@@ -325,6 +367,14 @@ void mdev_callback_self_name_change(Tox *tox,
 {
     tox->mdev->self_name_change = function;
     tox->mdev->self_name_change_userdata = userdata;
+}
+
+void mdev_callback_self_status_message_change(Tox *tox,
+                                   void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),
+                                   void *userdata)
+{
+    tox->mdev->self_status_message_change = function;
+    tox->mdev->self_status_message_change_userdata = userdata;
 }
 
 

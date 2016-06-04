@@ -167,7 +167,8 @@ struct MDevice {
     /* Callbacks */
     void (*self_name_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
     void *self_name_change_userdata;
-
+    void (*self_status_message_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
+    void *self_status_message_change_userdata;
 
     MDevice_Options options;
 };
@@ -185,6 +186,20 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk);
 
 /* Removes a device and adds it to the removed_devices blacklist */
 int mdev_remove_device(Tox* tox, uint32_t device_num);
+
+/* Multi-device set callbacks */
+void mdev_callback_self_name_change(Tox *tox,
+                                   void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),
+                                   void *userdata);
+void mdev_callback_self_status_message_change(Tox *tox,
+                                   void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),
+                                   void *userdata);
+
+/* Multi-device send data fxns */
+bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length);
+bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t length);
+void mdev_send_message_generic(Tox* tox, uint32_t friend_number, TOX_MESSAGE_TYPE type,
+                               const uint8_t *message, size_t length);
 
 /* Return size of the mdev data (for saving) */
 size_t mdev_size(const Tox *tox);

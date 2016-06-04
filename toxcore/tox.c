@@ -624,6 +624,10 @@ bool tox_self_set_status_message(Tox *tox, const uint8_t *status, size_t length,
     Messenger *m = tox->m;
 
     if (m_set_statusmessage(tox, status, length) == 0) {
+
+        /* TODO error checking here */
+        mdev_sync_status_message_change(tox, status, length);
+
         SET_ERROR_PARAMETER(error, TOX_ERR_SET_INFO_OK);
         return 1;
     } else {
@@ -642,6 +646,11 @@ void tox_self_get_status_message(const Tox *tox, uint8_t *status)
 {
     if (status)
         m_copy_self_statusmessage(tox, status);
+}
+
+void tox_callback_mdev_self_status_message(Tox *tox, tox_mdev_self_status_message_cb *function, void *user_data)
+{
+    mdev_callback_self_status_message_change(tox, function, user_data);
 }
 
 void tox_self_set_status(Tox *tox, TOX_USER_STATUS user_status)

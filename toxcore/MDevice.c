@@ -166,6 +166,10 @@ static int handle_status(void *object, int dev_num, int device_id, uint8_t statu
 {
     Tox *tox = object;
     MDevice *mdev = tox->mdev;
+
+    if (dev_num < 0 || dev_num > UINT32_MAX || (uint32_t)dev_num >= mdev->devices_count)
+        return -1;
+
     printf("handle_status MDEV dev_num %i || dev_id %i || status %u \n", dev_num, device_id, status);
     if (status) {
         set_mdevice_status(mdev, dev_num, MDEV_ONLINE);
@@ -186,6 +190,9 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
 
     Tox      *tox = object;
     MDevice *mdev = tox->mdev;
+
+    if (dev_num < 0 || dev_num > UINT32_MAX || (uint32_t)dev_num >= mdev->devices_count)
+        return -1;
 
     uint8_t packet_id = pkt[0];
     uint8_t *data = pkt + 1;

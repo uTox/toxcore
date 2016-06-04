@@ -1090,7 +1090,6 @@ typedef void tox_mdev_self_name_cb(Tox *tox, uint32_t device_number, const uint8
  */
 void tox_callback_mdev_self_name(Tox *tox, tox_mdev_self_name_cb *callback, void *user_data);
 
-
 /**
  * Set the client's status message.
  *

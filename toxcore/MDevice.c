@@ -80,6 +80,15 @@ static uint8_t mdev_device_not_valid(const MDevice *dev, uint32_t dev_num)
     return 1;
 }
 
+static int send_mdev_packet(Tox *tox, int32_t dev_num, uint8_t *packet, size_t length)
+{
+    MDevice *mdev = tox->mdev;
+
+    return write_cryptpacket(tox->net_crypto,
+                             toxconn_crypt_connection_id(mdev->dev_conns, mdev->devices[dev_num].toxconn_id),
+                             packet, length, 0) != -1;
+}
+
 static int send_online_packet(Tox *tox, int32_t dev_num, int32_t unused)
 {
     if (mdev_device_not_valid(tox->mdev, dev_num)) {
@@ -87,9 +96,7 @@ static int send_online_packet(Tox *tox, int32_t dev_num, int32_t unused)
     }
 
     uint8_t packet = PACKET_ID_ONLINE;
-    return write_cryptpacket(tox->net_crypto,
-                             toxconn_crypt_connection_id(tox->mdev->dev_conns, tox->mdev->devices[dev_num].toxconn_id),
-                             &packet, sizeof(packet), 0) != -1;
+    return send_mdev_packet(tox, dev_num, &packet, sizeof(packet));
 }
 
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status);
@@ -162,7 +169,13 @@ static void set_mdevice_status(MDevice *mdev, uint32_t dev_num, MDEV_STATUS stat
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status)
 {
     Tox *tox = object;
+    MDevice *mdev = tox->mdev;
     printf("handle_status MDEV dev_num %i || dev_id %i || status %u \n", dev_num, device_id, status);
+    if (status) {
+        set_mdevice_status(mdev, dev_num, MDEV_ONLINE);
+    } else {
+        set_mdevice_status(mdev, dev_num, MDEV_CONFIRMED);
+    }
     return 0;
 }
 
@@ -187,6 +200,7 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
             set_mdevice_status(mdev, dev_num, MDEV_ONLINE);
             send_online_packet(tox, dev_num, 0);
         } else {
+            printf("error, this device is offline\n");
             return -1;
         }
     }
@@ -200,10 +214,35 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
             break;
         }
 
-        case PACKET_ID_NICKNAME: {
-            if (data_length > MAX_NAME_LENGTH)
-                break;
+        case PACKET_ID_MDEV_SEND: {
+            if (data[0] == MDEV_SEND_NAME) {
+                uint8_t *name        = data + 1;
+                size_t   name_length = data_length - 1;
 
+                if (data_length > MAX_NAME_LENGTH) {
+                    break;
+                }
+
+                if (name_length > MAX_NAME_LENGTH) {
+                    break;
+                }
+
+                if (tox->m->name_length == name_length && (name_length == 0 || memcmp(name, tox->m->name, name_length) == 0)) {
+                    break;
+                }
+
+                if (name_length) {
+                    memcpy(tox->m->name, name, name_length);
+                }
+
+                tox->m->name_length = name_length;
+
+                if (mdev->self_name_change) {
+                    mdev->self_name_change(tox, dev_num, name, name_length, mdev->self_name_change_userdata);
+
+                }
+
+            }
             break;
         }
 
@@ -251,6 +290,26 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
 /******************************************************************************
  ******** Multi-device send data fxns                                  ********
  ******************************************************************************/
+bool mdev_sync_name_change(Tox *tox, uint8_t *name, size_t length)
+{
+    uint8_t packet[length + 2];
+
+    packet[0] = PACKET_ID_MDEV_SEND;
+    packet[1] = MDEV_SEND_NAME;
+    memcpy(&packet[2], name, length);
+
+    if (tox->mdev->devices_count == 0) {
+        return 0;
+    }
+
+    for (int i = 0; i <= tox->mdev->devices_count; ++i) {
+        send_mdev_packet(tox, i, packet, length + 2);
+    }
+
+    return 1;
+}
+
+
 void mdev_send_message_generic(tox, friend_number, type, message, length)
 {
     return;

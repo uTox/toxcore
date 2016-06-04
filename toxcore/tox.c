@@ -510,7 +510,7 @@ uint32_t tox_self_get_device_count(const Tox *tox)
 }
 
 bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *public_key, TOX_ERR_DEVICE_GET *error)
-{   
+{
     if (!tox || !tox->mdev) {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_NULL);
         return 0;
@@ -582,12 +582,17 @@ bool tox_self_set_name(Tox *tox, const uint8_t *name, size_t length, TOX_ERR_SET
         // --: function to set different per group names?
         // Yes, in the new groupchats
         send_name_all_groups(tox->gc);
+
+        /* TODO error checking here */
+        mdev_sync_name_change(tox, name, length);
+
         SET_ERROR_PARAMETER(error, TOX_ERR_SET_INFO_OK);
         return 1;
     } else {
         SET_ERROR_PARAMETER(error, TOX_ERR_SET_INFO_TOO_LONG);
         return 0;
     }
+
 }
 
 size_t tox_self_get_name_size(const Tox *tox)

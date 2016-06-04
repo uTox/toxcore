@@ -86,6 +86,7 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 typedef enum {
     MDEV_NULL_PKT,
 
+    /* Sync type packets are for historical changes */
     MDEV_SYNC_META,
 
     MDEV_SYNC_SELF,
@@ -106,6 +107,13 @@ typedef enum {
     MDEV_SYNC_MESSAGES,
 
     MDEV_SYNC_NOTHING,
+
+    /* Send type packets are for recent changes */
+    MDEV_SEND_NAME,
+    MDEV_SEND_MSG,
+    MDEV_SEND_STATUS,
+    MDEV_SEND_MESSAGE,
+    MDEV_SEND_MESSAGE_ACTION,
 
 } MDEV_PACKET_TYPE;
 
@@ -159,7 +167,6 @@ struct MDevice {
     /* Callbacks */
     void (*self_name_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
     void *self_name_change_userdata;
-
 
 
     MDevice_Options options;

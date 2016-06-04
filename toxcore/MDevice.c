@@ -519,7 +519,7 @@ uint8_t *mdev_save(const Tox *tox, uint8_t *data)
     size_t len = mdev_size(tox) - save_subheader_size();
     data = save_write_subheader(data, len, SAVE_STATE_TYPE_MDEVICE, SAVE_STATE_COOKIE_TYPE);
 
-    *data++ = 1; /* Current version of the on-disk format */
+    *data++ = 0; /* Current version of the on-disk format */
 
     host_to_lendian32(data, tox->mdev->devices_count);
     data += sizeof(uint32_t);
@@ -569,7 +569,7 @@ int mdev_save_read_sections_callback(Tox *tox, const uint8_t *data, uint32_t len
 
     MDevice* self = tox->mdev;
 
-    if (version == 1) {
+    if (version == 0) {
         if (length < sizeof(uint32_t))
             return 0;
         length -= sizeof(uint32_t);

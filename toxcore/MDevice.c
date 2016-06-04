@@ -399,13 +399,11 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
         return -1;
     }
 
-    /* TODO
-     *
-     * check vs our primary key
-     * check vs out DHT key
-     * check vs already existing in list
-     * check vs other?
-     */
+    if (public_key_cmp(real_pk, tox->net_crypto->self_public_key) == 0) {
+        return -1;
+    } else if (public_key_cmp(real_pk, tox->dht->self_public_key) == 0) {
+        return -1;
+    }
 
     int32_t dev_id = get_device_id(tox->mdev, real_pk);
 

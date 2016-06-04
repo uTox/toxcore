@@ -458,7 +458,7 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk)
     int32_t dev_id = get_device_id(tox->mdev, real_pk);
 
     if (dev_id != -1) {
-        if (tox->mdev->devices[dev_id].status >= FRIEND_CONFIRMED) {
+        if (tox->mdev->devices[dev_id].status != NO_MDEV) {
             printf("Dev ID Already exists in list...\n");
             return -1;
         }

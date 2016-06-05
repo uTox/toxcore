@@ -118,7 +118,6 @@ typedef enum {
 } MDEV_PACKET_TYPE;
 
 typedef enum {
-    NO_MDEV,
     MDEV_PENDING,
     MDEV_CONFIRMED,
     MDEV_ONLINE,
@@ -140,11 +139,8 @@ typedef struct {
 
     uint64_t    last_seen_time;
 
-    uint8_t     localname[MAX_NAME_LENGTH];
-    uint16_t    localname_length;
-
-    uint8_t     remotename[MAX_NAME_LENGTH];
-    uint16_t    remotename_length;
+    uint8_t     name[MAX_NAME_LENGTH];
+    uint16_t    name_length;
 } Device;
 
 typedef struct Messenger Messenger;
@@ -161,8 +157,6 @@ struct MDevice {
 
     uint8_t         (*removed_devices)[crypto_box_PUBLICKEYBYTES];
     uint32_t        removed_devices_count;
-
-    uint8_t status;
 
     /* Callbacks */
     void (*self_name_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
@@ -182,10 +176,10 @@ void do_multidevice(MDevice *dev);
 MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error);
 
 /* TODO DOCUMENT THIS FXN */
-int mdev_add_new_device_self(Tox *tox, const uint8_t *real_pk);
+int mdev_add_new_device_self(Tox *tox, const uint8_t* name, size_t length, const uint8_t *real_pk);
 
 /* Removes a device and adds it to the removed_devices blacklist */
-int mdev_remove_device(Tox* tox, uint32_t device_num);
+int mdev_remove_device(Tox* tox, const uint8_t *address);
 
 /* Multi-device set callbacks */
 void mdev_callback_self_name_change(Tox *tox,

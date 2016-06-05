@@ -486,17 +486,40 @@ void tox_self_get_address(const Tox *tox, uint8_t *address)
         getaddress(tox, address);
 }
 
-bool tox_self_add_device(Tox *tox, const uint8_t *public_key, TOX_ERR_DEVICE_ADD *error)
+bool tox_self_add_device(Tox *tox, const uint8_t* name, size_t length,
+                         const uint8_t *address, TOX_ERR_DEVICE_ADD *error)
 {
-    if (!tox || !tox->mdev || !public_key) {
+    if (!tox || !tox->mdev || length > MAX_NAME_LENGTH || !address) {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
         return 0;
     }
 
-    if (mdev_add_new_device_self(tox, public_key) != 0){
+    if (!name && length) {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
         return 0;
+    }
+
+    if (length > MAX_NAME_LENGTH ) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_TOO_LONG);
+        return 0;
+    }
+
+    int ret;
+    if ((ret = mdev_add_new_device_self(tox, name, length, address)) < 0) {
+        if (ret == -2) {
+            SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_BAD_KEY);
+        } else if (ret == -3) {
+            SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_OWN_KEY);
+        } else if (ret == -4) {
+            SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_BLACKLISTED);
+        } else if (ret == -5) {
+            SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_NULL);
+        } else {
+            SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_INTERNAL);
+        }
+        return 0;
     } else {
+        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_ADD_OK);
         return 1;
     }
 }
@@ -509,7 +532,8 @@ uint32_t tox_self_get_device_count(const Tox *tox)
     return tox->mdev->devices_count;
 }
 
-bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *public_key, TOX_ERR_DEVICE_GET *error)
+bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *name, TOX_DEVICE_STATUS *status,
+                         uint8_t *public_key, TOX_ERR_DEVICE_GET *error)
 {
     if (!tox || !tox->mdev) {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_NULL);
@@ -521,29 +545,57 @@ bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *public_key, TOX
         return 0;
     }
 
+    if (name) {
+        memcpy(name, tox->mdev->devices[device_num].name, tox->mdev->devices[device_num].name_length);
+        name[tox->mdev->devices[device_num].name_length] = '\0';
+    }
+    if (status) {
+        *status = tox->mdev->devices[device_num].status;
+    }
     memcpy(public_key, tox->mdev->devices[device_num].real_pk, sizeof(tox->mdev->devices[device_num].real_pk));
     SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_OK);
     return 1;
 }
 
-bool tox_self_delete_device(Tox *tox, uint32_t device_num, TOX_ERR_DEVICE_DEL *error)
+uint32_t tox_self_get_blacklisted_device_count(const Tox *tox)
+{
+    if (!tox || !tox->mdev)
+        return 0;
+
+    return tox->mdev->removed_devices_count;
+}
+
+bool tox_self_get_blacklisted_device(Tox *tox, uint32_t device_num, uint8_t *public_key,
+                                     TOX_ERR_BLACKLISTED_DEVICE_GET *error)
 {
     if (!tox || !tox->mdev) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_BLACKLISTED_DEVICE_GET_NULL);
+        return 0;
+    }
+
+    if (device_num >= tox->mdev->removed_devices_count) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_BLACKLISTED_DEVICE_GET_NODEV);
+        return 0;
+    }
+
+    memcpy(public_key, tox->mdev->removed_devices[device_num], sizeof(tox->mdev->removed_devices[device_num]));
+    SET_ERROR_PARAMETER(error, TOX_ERR_BLACKLISTED_DEVICE_GET_OK);
+    return 1;
+}
+
+bool tox_self_delete_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_DEL *error)
+{
+    if (!tox || !tox->mdev || !address) {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_NULL);
         return 0;
     }
 
-    if (device_num >= tox->mdev->devices_count) {
+    if (mdev_remove_device(tox, address) < 0) {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_NODEV);
         return 0;
-    }
-
-    if (mdev_remove_device(tox, device_num) < 0) {
-        SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_NODEV);
-        return -1;
     } else {
         SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_DEL_OK);
-        return 0;
+        return 1;
     }
 }
 

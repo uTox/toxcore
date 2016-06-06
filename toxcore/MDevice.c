@@ -155,11 +155,91 @@ static void set_mdevice_status(MDevice *mdev, uint32_t dev_num, MDEV_STATUS stat
 {
     mdev->devices[dev_num].status = status;
 
-    if (status == MDEV_CONFIRMED) {
+    mdev->sync_role     = 0;
+    mdev->sync_status   = 0;
 
+    if (status == MDEV_CONFIRMED) {
+        /* TODO stuff here */
     } else if (status == MDEV_ONLINE) {
+        /* TODO stuff here */
+    }
+}
+
+static int init_sync(Tox *tox, uint32_t dev_num) {
+
+    tox->mdev->sync_status = MDEV_SYNC_STATUS_ACTIVE;
+
+    uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(tox->uptime) ];
+
+    unix_time_update();
+
+    packet[0] = PACKET_ID_MDEV_SYNC;
+    packet[1] = MDEV_SYNC_META_UPTIME;
+    packet[2] = (unix_time() - tox->uptime);
+
+    return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+}
+
+static int init_sync_friends(Tox *tox, uint32_t dev_num)
+{
+
+    MDevice *mdev = tox->mdev;
+    Messenger * m = tox->m;
+
+    mdev->sync_status = MDEV_SYNC_STATUS_FRIENDS_SENDING;
+
+    uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(m->numfriends)];
+
+    packet[0] = PACKET_ID_MDEV_SYNC;
+    packet[1] = MDEV_SYNC_CONTACT_COUNT;
+    packet[2] = (m->numfriends);
+
+    return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+}
+
+static int request_friend_sync(Tox *tox, uint32_t dev_num)
+{
+    tox->mdev->sync_status = MDEV_SYNC_STATUS_FRIENDS_RECIVING;
+
+    uint8_t packet[ (sizeof(uint8_t) * 2)];
+
+    packet[0] = PACKET_ID_MDEV_SYNC;
+    packet[1] = MDEV_SYNC_CONTACT_START;
+
+    return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+}
+
+static int actually_sync_friend_list(Tox *tox, uint32_t dev_num)
+{
+
+    if (tox->m->numfriends == 0) {
+        return -1;
+    }
+
+    int i;
+    uint8_t packet[sizeof(uint8_t) * 2 + sizeof(uint8_t) * crypto_box_PUBLICKEYBYTES];
+
+    for (i = 0; i < tox->m->numfriends; ++i) {
+        memset(packet, 0, sizeof(packet));
+
+        packet[0] = PACKET_ID_MDEV_SYNC;
+        packet[1] = MDEV_SYNC_CONTACT_APPEND;
+
+        memcpy(packet + 2, tox->m->friendlist[i].device[0].real_pk, crypto_box_PUBLICKEYBYTES);
+
+        if (!send_mdev_packet(tox, dev_num, packet, sizeof(packet))) {
+            printf("ERROR sending MDEV_SYNC_CONTACT_APPEND packet \n");
+            return -2;
+        }
 
     }
+
+    uint8_t done[2] = { PACKET_ID_MDEV_SYNC, MDEV_SYNC_CONTACT_DONE };
+    if (!send_mdev_packet(tox, dev_num, done, sizeof(done))) {
+        return -3;
+    }
+
+    return 0;
 }
 
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status)
@@ -173,16 +253,183 @@ static int handle_status(void *object, int dev_num, int device_id, uint8_t statu
     printf("handle_status MDEV dev_num %i || dev_id %i || status %u \n", dev_num, device_id, status);
     if (status) {
         set_mdevice_status(mdev, dev_num, MDEV_ONLINE);
+
+        init_sync(tox, dev_num);
     } else {
         set_mdevice_status(mdev, dev_num, MDEV_CONFIRMED);
     }
     return 0;
 }
 
+static int handle_packet_send(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t length)
+{
+    MDevice *mdev = tox->mdev;
+
+    switch (pkt[0]) {
+        case MDEV_SEND_NAME: {
+            uint8_t *name        = pkt + 1;
+            size_t   name_length = length - 1;
+
+            if (name_length > MAX_NAME_LENGTH) {
+                return -1;
+            }
+
+            if (name_length > MAX_NAME_LENGTH) {
+                return -1;
+            }
+
+            if (tox->m->name_length == name_length && (name_length == 0 || memcmp(name, tox->m->name, name_length) == 0)) {
+                return -1;
+            }
+
+            if (name_length) {
+                memcpy(tox->m->name, name, name_length);
+            }
+
+            tox->m->name_length = name_length;
+
+            if (mdev->self_name_change) {
+                mdev->self_name_change(tox, dev_num, name, name_length, mdev->self_name_change_userdata);
+            }
+
+            break;
+        }
+
+        case MDEV_SEND_STATUS: {
+            uint8_t *status        = pkt + 1;
+            size_t   status_length = length - 1;
+
+            if (status_length > MAX_NAME_LENGTH) {
+                break;
+            }
+
+            if (status_length > MAX_STATUSMESSAGE_LENGTH) {
+                break;
+            }
+
+            if (status_length) {
+                memcpy(tox->m->statusmessage, status, status_length);
+            }
+
+            tox->m->statusmessage_length = status_length;
+
+            if (mdev->self_status_message_change) {
+                mdev->self_status_message_change(tox, dev_num, status, status_length,
+                                                 mdev->self_status_message_change_userdata);
+            }
+
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t size)
+{
+    switch (pkt[0]) {
+        case MDEV_SYNC_META: {
+            printf("SYNC_META is unsupported\n");
+            return -1;
+        }
+
+        case MDEV_SYNC_META_UPTIME: {
+
+            if ( (size - 1) < sizeof(tox->uptime) ) {
+                return -1;
+            }
+
+            unix_time_update();
+
+            uint64_t them = pkt[1];
+            uint64_t us   = (unix_time() - tox->uptime);
+
+            printf("their uptime is %lu \n", them);
+            printf(" our  uptime is %lu \n", us);
+
+            if (us > them) {
+                tox->mdev->sync_role = MDEV_SYNC_ROLE_PRIMARY;
+                init_sync_friends(tox, dev_num);
+            } else {
+                tox->mdev->sync_role = MDEV_SYNC_ROLE_SECONDARY;
+            }
+
+            break;
+        }
+
+        case MDEV_SYNC_CONTACT_START: {
+            if (size != 1) {
+                return -1;
+            }
+
+            printf("they request that we start syncing friends\n");
+            actually_sync_friend_list(tox, dev_num);
+
+            /* TODO if actually_sync_friend_list != 0 handle the error somehow... */
+            break;
+        }
+
+        case MDEV_SYNC_CONTACT_COUNT: {
+            if ( (size - 1) < sizeof(tox->m->numfriends) ) {
+                return -1;
+            }
+
+            uint32_t their_friend_count = pkt[1];
+
+            printf("they have %u friends ... asking for sync\n", their_friend_count);
+
+            request_friend_sync(tox, dev_num);
+            break;
+        }
+
+        case MDEV_SYNC_CONTACT_APPEND: {
+            if ( (size -1) < crypto_box_PUBLICKEYBYTES) {
+                return -1;
+            }
+
+            printf("they sent us a friend : hexid \n\t");
+
+            for(int i = 1; i <= crypto_box_PUBLICKEYBYTES; ++i) {
+                printf("%#2X", pkt[i]);
+            }
+
+            printf("\n");
+
+
+            break;
+        }
+
+        case MDEV_SYNC_CONTACT_REMOVE: {
+
+            printf("they deleted friend ... does nothing\n");
+            break;
+        }
+
+        case MDEV_SYNC_CONTACT_REJECT: {
+
+            printf("they rejected a friend change ... does nothing\n");
+
+            /* TODO revert all pending changes */
+
+            break;
+        }
+
+
+        case MDEV_SYNC_CONTACT_DONE: {
+
+            printf("they said they're done with fiends... does nothing\n");
+            break;
+        }
+
+
+    }
+
+    return 0;
+}
 
 static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt, uint16_t len)
 {
-    printf("handle_packet MDEV dev_num %i // dev_id %i // pkt %u // length %u \n", dev_num, device_id, pkt[0], len);
+    // printf("handle_packet MDEV dev_num %i // dev_id %i // pkt %u // length %u \n", dev_num, device_id, pkt[0], len);
 
     if (len == 0) {
         return -1;
@@ -208,97 +455,19 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
         }
     }
 
-    switch (packet_id) {
-        case PACKET_ID_OFFLINE: {
-            if (data_length != 0)
-                break;
-
+    if (packet_id == PACKET_ID_OFFLINE) {
+        if (data_length != 0) {
+            return -1;
+        } else {
             set_mdevice_status(mdev, dev_num, MDEV_CONFIRMED);
-            break;
         }
-
-        case PACKET_ID_MDEV_SEND: {
-            if (data[0] == MDEV_SEND_NAME) {
-                uint8_t *name        = data + 1;
-                size_t   name_length = data_length - 1;
-
-                if (data_length > MAX_NAME_LENGTH) {
-                    break;
-                }
-
-                if (name_length > MAX_NAME_LENGTH) {
-                    break;
-                }
-
-                if (tox->m->name_length == name_length && (name_length == 0 || memcmp(name, tox->m->name, name_length) == 0)) {
-                    break;
-                }
-
-                if (name_length) {
-                    memcpy(tox->m->name, name, name_length);
-                }
-
-                tox->m->name_length = name_length;
-
-                if (mdev->self_name_change) {
-                    mdev->self_name_change(tox, dev_num, name, name_length, mdev->self_name_change_userdata);
-
-                }
-
-            } else if (data[0] == MDEV_SEND_STATUS) {
-                uint8_t *status        = data + 1;
-                size_t   status_length = data_length - 1;
-
-                if (data_length > MAX_NAME_LENGTH) {
-                    break;
-                }
-
-                if (status_length > MAX_STATUSMESSAGE_LENGTH) {
-                    break;
-                }
-
-                if (status_length) {
-                    memcpy(tox->m->statusmessage, status, status_length);
-                }
-
-                tox->m->statusmessage_length = status_length;
-
-                if (mdev->self_status_message_change) {
-                    mdev->self_status_message_change(tox, dev_num, status, status_length,
-                                                     mdev->self_status_message_change_userdata);
-                }
-            }
-
-            break;
-        }
-
-        case PACKET_ID_STATUSMESSAGE: {
-            if (data_length > MAX_STATUSMESSAGE_LENGTH)
-                break;
-
-            break;
-        }
-
-        case PACKET_ID_USERSTATUS: {
-            if (data_length != 1)
-                break;
-
-            break;
-        }
-
-        case PACKET_ID_MESSAGE:
-        case PACKET_ID_ACTION: {
-            if (data_length == 0)
-                break;
-
-            break;
-        }
-
-
-
-        default: {
-            break;
-        }
+    } else if (packet_id == PACKET_ID_MDEV_SEND) {
+        return handle_packet_send(tox, dev_num, data, len -1);
+    } else if (packet_id == PACKET_ID_MDEV_SYNC) {
+        return handle_packet_sync(tox, dev_num, data, len -1);
+    } else {
+        printf("ERROR MDevice unknown packet type %u\n", packet_id);
+        return -1;
     }
 
     return 0;

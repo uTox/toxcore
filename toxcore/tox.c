@@ -313,6 +313,8 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_OK);
     }
 
+    unix_time_update();
+
     tox->uptime = unix_time();
 
     return tox;
@@ -550,7 +552,7 @@ bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t *name, TOX_DEVIC
         name[tox->mdev->devices[device_num].name_length] = '\0';
     }
     if (status) {
-        *status = tox->mdev->devices[device_num].status;
+        *status = (TOX_DEVICE_STATUS)tox->mdev->devices[device_num].status;
     }
     memcpy(public_key, tox->mdev->devices[device_num].real_pk, sizeof(tox->mdev->devices[device_num].real_pk));
     SET_ERROR_PARAMETER(error, TOX_ERR_DEVICE_GET_OK);
@@ -791,6 +793,8 @@ uint32_t tox_friend_add(Tox *tox, const uint8_t *address, const uint8_t *message
         return UINT32_MAX;
     }
 
+    /* TODO return an error if mdevice has a sync in progress */
+
     int32_t ret = m_addfriend(tox, address, message, length);
 
     if (ret >= 0) {
@@ -809,6 +813,8 @@ uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend
         return UINT32_MAX;
     }
 
+    /* TODO return an error if mdevice has a sync in progress */
+
     int32_t ret = m_add_device_to_friend(tox, address, friend_number);
 
     if (ret >= 0) {
@@ -826,6 +832,8 @@ uint32_t tox_friend_add_norequest(Tox *tox, const uint8_t *public_key, TOX_ERR_F
         return UINT32_MAX;
     }
 
+    /* TODO return an error if mdevice has a sync in progress */
+
     int32_t ret = m_addfriend_norequest(tox, public_key);
 
     if (ret >= 0) {
@@ -839,6 +847,8 @@ uint32_t tox_friend_add_norequest(Tox *tox, const uint8_t *public_key, TOX_ERR_F
 
 bool tox_friend_delete(Tox *tox, uint32_t friend_number, TOX_ERR_FRIEND_DELETE *error)
 {
+    /* TODO return an error if mdevice has a sync in progress */
+
     int ret = m_delfriend(tox, friend_number);
 
     //TODO handle if realloc fails?
@@ -918,6 +928,11 @@ void tox_self_get_friend_list(const Tox *tox, uint32_t *list)
         copy_friendlist(m, list, tox_self_get_friend_list_size(tox));
     }
 }
+
+void tox_callback_friend_list_change(Tox *tox, tox_friend_list_change_cb *function, void *user_data) {
+    m_callback_friend_list_change(tox, function, user_data);
+}
+
 
 size_t tox_friend_get_name_size(const Tox *tox, uint32_t friend_number, TOX_ERR_FRIEND_QUERY *error)
 {

@@ -277,6 +277,10 @@ struct Messenger {
 
     void (*friend_message)(struct Tox *tox, uint32_t, unsigned int, const uint8_t *, size_t, void *);
     void *friend_message_userdata;
+
+    tox_friend_list_change_cb (*friend_list_change);
+    void *friend_list_change_userdata;
+
     void (*friend_namechange)(struct Tox *tox, uint32_t, const uint8_t *, size_t, void *);
     void *friend_namechange_userdata;
     void (*friend_statusmessagechange)(struct Tox *tox, uint32_t, const uint8_t *, size_t, void *);
@@ -524,6 +528,11 @@ void m_callback_friendrequest(Tox *tox, void (*function)(Tox *tox, const uint8_t
  */
 void m_callback_friendmessage(Tox *tox, void (*function)(Tox *tox, uint32_t, unsigned int, const uint8_t *,
                               size_t, void *), void *userdata);
+
+/* Set the callback for bulk friend list changes, when it's expected that the version toxcore has will no longer match
+ * the version may have.
+ */
+void m_callback_friend_list_change(Tox *tox, tox_friend_list_change_cb *function, void *user_data);
 
 /* Set the callback for name changes.
  *  Function(uint32_t friendnumber, uint8_t *newname, size_t length)

@@ -1547,6 +1547,23 @@ typedef enum TOX_ERR_FRIEND_QUERY {
 
 
 /**
+ * This function provides no data, and only serves as a notification, clients
+ * are expected to re-sync or validate the data they have.
+ */
+typedef void tox_friend_list_change_cb(Tox *tox, void *user_data);
+
+/**
+ * Set the callback for the `friend_list_change` event. Pass NULL to unset.
+ *
+ * This event is triggered when the friend list changes,
+ * When the friend list is synchronized by Multi-Device.
+ *
+ * TODO: should we call this after toxcore loads a friend list?
+ */
+void tox_callback_friend_list_change(Tox *tox, tox_friend_list_change_cb *callback, void *user_data);
+
+
+/**
  * Return the length of the friend's name. If the friend number is invalid, the
  * return value is unspecified.
  *

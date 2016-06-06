@@ -75,7 +75,7 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
  * compiling API version.
  */
 #define TOXMD_VERSION_IS_ABI_COMPATIBLE()                         \
-  toxmd_version_is_compatible(TOX_VERSION_MAJOR, TOX_VERSION_MINOR, TOX_VERSION_PATCH)
+  toxmd_version_is_compatible(TOXMD_VERSION_MAJOR, TOXMD_VERSION_MINOR, TOXMD_VERSION_PATCH)
 
 
 /* TODO: These should only live in Messenger.h */
@@ -88,27 +88,36 @@ typedef enum {
 
     /* Sync type packets are for historical changes */
     MDEV_SYNC_META,
+    MDEV_SYNC_META_UPTIME,
 
     MDEV_SYNC_SELF,
     MDEV_SYNC_SELF_NAME,
     MDEV_SYNC_SELF_MSG,
     MDEV_SYNC_SELF_STATUS,
+    MDEV_SYNC_SELF_DONE,
 
-    MDEV_SYNC_FRIEND,
-    MDEV_SYNC_FRIEND_COUNT,
-    MDEV_SYNC_FRIEND_ADD,
-    MDEV_SYNC_FRIEND_REMOVE,
+    MDEV_SYNC_CONTACT_START,
+    MDEV_SYNC_CONTACT_COUNT,
+    MDEV_SYNC_CONTACT_APPEND,         /* First PubKey for this friend                   */
+    MDEV_SYNC_CONTACT_APPEND_DEVICE,  /* Other known devices for the last sent friend   */
+    MDEV_SYNC_CONTACT_REMOVE,
+    MDEV_SYNC_CONTACT_REJECT,
+    MDEV_SYNC_CONTACT_DONE,
+    MDEV_SYNC_CONTACT_ERROR,
 
     MDEV_SYNC_DEVICE,
     MDEV_SYNC_DEVICE_COUNT,
-    MDEV_SYNC_DEVICE_ADD,
+    MDEV_SYNC_DEVICE_APPEND,
     MDEV_SYNC_DEVICE_REMOVE,
+    MDEV_SYNC_DEVICE_REJECT,
+    MDEV_SYNC_DEVICE_DONE,
+    MDEV_SYNC_DEVICE_ERROR,
 
     MDEV_SYNC_MESSAGES,
 
     MDEV_SYNC_NOTHING,
 
-    /* Send type packets are for recent changes */
+    /* Send type packets are for active changes */
     MDEV_SEND_NAME,
     MDEV_SEND_MSG,
     MDEV_SEND_STATUS,
@@ -144,8 +153,43 @@ typedef struct {
 } Device;
 
 typedef struct Messenger Messenger;
-
 typedef struct MDevice MDevice;
+
+/*
+ * Role and status are used to determine where in the sync status we are.
+ *     * The PRIMARY role will signal it's ready to start
+ *     * Wait for the request sync request
+ *     * Send all available data, followed by a DONE packet
+ * The PRIMARY will then wait for the SECONDARY to either send back it's own
+ * data, or send it's own DONE packet.
+ *
+ * Once the PRIMARY receives the DONE packet from the SECONDARY, it'll
+ * signal it's ready to send the next section, then wait again for the request.
+ */
+
+typedef enum {
+    MDEV_SYNC_ROLE_NONE,
+    MDEV_SYNC_ROLE_PRIMARY,
+    MDEV_SYNC_ROLE_SECONDARY,
+} MDEV_SYNC_ROLE;
+
+typedef enum {
+    MDEV_SYNC_STATUS_NONE,
+    MDEV_SYNC_STATUS_ACTIVE,
+
+
+    MDEV_SYNC_STATUS_META_SENDING,
+    MDEV_SYNC_STATUS_META_RECIVING,
+
+    MDEV_SYNC_STATUS_FRIENDS_SENDING,
+    MDEV_SYNC_STATUS_FRIENDS_RECIVING,
+
+    MDEV_SYNC_STATUS_DEVICES_SENDING,
+    MDEV_SYNC_STATUS_DEVICES_RECIVING,
+
+
+    MDEV_SYNC_STATUS_DONE,
+} MDEV_SYNC_STATUS;
 
 struct MDevice {
     Tox* tox;
@@ -157,6 +201,13 @@ struct MDevice {
 
     uint8_t         (*removed_devices)[crypto_box_PUBLICKEYBYTES];
     uint32_t        removed_devices_count;
+
+    /* Sync status */
+    MDEV_SYNC_ROLE      sync_role;
+    MDEV_SYNC_STATUS    sync_status;
+
+    bool sync_active_friends;
+
 
     /* Callbacks */
     void (*self_name_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);

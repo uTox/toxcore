@@ -965,6 +965,13 @@ void m_callback_friendmessage(Tox *tox, void (*function)(Tox *tox, uint32_t, uns
     tox->m->friend_message_userdata = userdata;
 }
 
+void m_callback_friend_list_change(Tox *tox, tox_friend_list_change_cb *function, void *userdata)
+{
+    tox->m->friend_list_change          = function;
+    tox->m->friend_list_change_userdata = userdata;
+}
+
+
 void m_callback_namechange(Tox *tox, void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),
                            void *userdata)
 {

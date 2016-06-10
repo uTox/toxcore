@@ -324,6 +324,10 @@ struct Messenger {
     Messenger_Options options;
 };
 
+/** realloc the friendlist of @m to @num
+ *
+ * Returns -1 on failure */
+int realloc_friendlist(Messenger *m, uint32_t num);
 
 /* Format: [real_pk (32 bytes)][nospam number (4 bytes)][checksum (2 bytes)]
  *
@@ -367,6 +371,11 @@ int32_t m_add_device_to_friend(Tox *tox, const uint8_t *address, uint32_t friend
  *  return -1 if no such friend.
  */
 int32_t getfriend_id(const Messenger *m, const uint8_t *real_pk);
+
+/*  return the device number associated to that client id.
+ *  return -1 if no such friend or no such device.
+ */
+int32_t getfriend_devid(const Messenger *m, const uint8_t *real_pk);
 
 /* Copies the public key associated to that friend id into real_pk buffer.
  * Make sure that real_pk is of size crypto_box_PUBLICKEYBYTES.
@@ -516,6 +525,14 @@ int m_set_usertyping(Tox *tox, int32_t friendnumber, uint8_t is_typing);
  * returns 1 if friend is typing.
  */
 int m_get_istyping(const Tox *tox, int32_t friendnumber);
+
+/* Set the status message for a friend
+ *
+ * returns 0 on success */
+int set_friend_statusmessage(const Messenger *m, int32_t friendnumber, const uint8_t *status, uint16_t length);
+
+/* Set the current state for a friend. */
+void set_friend_userstatus(const Messenger *m, int32_t friendnumber, uint8_t status);
 
 /* Set the function that will be executed when a friend request is received.
  *  Function format is function(uint8_t * public_key, uint8_t * data, size_t length)

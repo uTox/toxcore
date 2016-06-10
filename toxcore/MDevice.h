@@ -103,6 +103,7 @@ typedef enum {
     MDEV_SYNC_CONTACT_REMOVE,
     MDEV_SYNC_CONTACT_REJECT,
     MDEV_SYNC_CONTACT_DONE,
+    MDEV_SYNC_CONTACT_COMMIT,
     MDEV_SYNC_CONTACT_ERROR,
 
     MDEV_SYNC_DEVICE,
@@ -191,6 +192,27 @@ typedef enum {
     MDEV_SYNC_STATUS_DONE,
 } MDEV_SYNC_STATUS;
 
+
+/* TODO: write a callback to notify the client if there was an error
+ * during sync */
+typedef enum {
+    MDEV_SYNC_ERR_NONE,
+    MDEV_SYNC_ERR_REFUSED,
+    MDEV_SYNC_ERR_UNSUPPORTED,
+
+    MDEV_SYNC_ERR_UNEXPECTED, /* Used if one device tries to sync out of order */
+    MDEV_SYNC_ERR_VERSION_INCOPAT, /* MDevice version mismatch; can not sync */
+    MDEV_SYNC_ERR_UNKNOWN,
+
+} MDEV_SYNC_ERR;
+
+typedef enum {
+    MDEV_INTERN_SYNC_ERR_NONE,
+
+    MDEV_INTERN_SYNC_ERR_CALLBACK_NOT_SET,
+
+} MDEV_INTERN_SYNC_ERR;
+
 struct MDevice {
     Tox* tox;
 
@@ -205,8 +227,11 @@ struct MDevice {
     /* Sync status */
     MDEV_SYNC_ROLE      sync_role;
     MDEV_SYNC_STATUS    sync_status;
+    uint32_t            sync_dev_num;
 
-    bool sync_active_friends;
+    Friend      *sync_friendlist;
+    uint32_t    sync_friendlist_count;
+    uint32_t    sync_friend_real_count;
 
 
     /* Callbacks */

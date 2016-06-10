@@ -93,6 +93,23 @@ int32_t getfriend_id(const Messenger *m, const uint8_t *real_pk)
     return -1;
 }
 
+int32_t getfriend_devid(const Messenger *m, const uint8_t *real_pk)
+{
+    uint32_t i, device;
+
+    for (i = 0; i < m->numfriends; ++i) {
+        if (m->friendlist[i].status > 0) {
+            for(device = 0; device < MAX_DEVICE_COUNT; ++device) {
+                if (id_equal(real_pk, m->friendlist[i].device[device].real_pk)) {
+                    return device;
+                }
+            }
+        }
+    }
+
+    return -1;
+}
+
 /* Copies the public key associated to that friend id into real_pk buffer.
  * Make sure that real_pk is of size crypto_box_PUBLICKEYBYTES.
  *
@@ -204,19 +221,14 @@ static int32_t init_new_friend(Tox *tox, const uint8_t *real_pk, uint8_t status)
             m->friendlist[i].device[0].friendcon_id = friendcon_id;
             m->friendlist[i].friendrequest_lastsent = 0;
             id_copy(m->friendlist[i].device[0].real_pk, real_pk);
+            m->friendlist[i].device_count = 1;
             m->friendlist[i].statusmessage_length = 0;
             m->friendlist[i].userstatus = USERSTATUS_NONE;
             m->friendlist[i].is_typing = 0;
             m->friendlist[i].message_id = 0;
-            toxconn_set_callbacks(m->fr_c,
-                                        friendcon_id,
-                                        MESSENGER_CALLBACK_INDEX,
-                                        &handle_status,
-                                        &handle_packet,
-                                        &handle_custom_lossy_packet,
-                                        tox,
-                                        i,  /* friend number */
-                                        0); /* device number always 0 for new friend */
+            toxconn_set_callbacks(m->fr_c, friendcon_id, MESSENGER_CALLBACK_INDEX,
+                                  &handle_status, &handle_packet, &handle_custom_lossy_packet,
+                                  tox, i, 0); /* device number always 0 for new friend */
 
             if (m->numfriends == i)
                 ++m->numfriends;
@@ -249,15 +261,10 @@ static int32_t init_new_device_friend(Tox *tox, uint32_t friend_number, const ui
                 tox->m->friendlist[friend_number].device[i].friendcon_id = friendcon_id;
                 tox->m->friendlist[friend_number].device[i].status = status;
                 id_copy(tox->m->friendlist[friend_number].device[i].real_pk, real_pk);
-                toxconn_set_callbacks(tox->m->fr_c,
-                                            friendcon_id,
-                                            MESSENGER_CALLBACK_INDEX,
-                                            &handle_status,
-                                            &handle_packet,
-                                            &handle_custom_lossy_packet,
-                                            tox,
-                                            friend_number,
-                                            i);
+                tox->m->friendlist[friend_number].device_count++;
+                toxconn_set_callbacks(tox->m->fr_c, friendcon_id, MESSENGER_CALLBACK_INDEX,
+                                      &handle_status, &handle_packet, &handle_custom_lossy_packet,
+                                      tox, friend_number, i);
 
                 if (toxconn_is_connected(tox->m->fr_c, friendcon_id) == TOXCONN_STATUS_CONNECTED) {
                     tox->m->friendlist[friend_number].device[i].status = FDEV_ONLINE;
@@ -647,7 +654,7 @@ int m_send_message_generic(Tox *tox, int32_t friendnumber, uint8_t type, const u
     uint8_t dev;
     int64_t packet_num = -1;
 
-    for (dev = 0; dev < MAX_DEVICE_COUNT; dev++) {
+    for (dev = 0; dev < m->friendlist[friendnumber].device_count; dev++) {
         if (m->friendlist[friendnumber].device[dev].status == FDEV_ONLINE) {
             int crypt_con_id = toxconn_crypt_connection_id(m->fr_c,
                                                            m->friendlist[friendnumber].device[dev].friendcon_id);
@@ -924,7 +931,7 @@ static int send_user_istyping(const Tox *tox, int32_t friendnumber, uint8_t is_t
     return write_cryptpacket_id(tox, friendnumber, PACKET_ID_TYPING, &typing, sizeof(typing), 0);
 }
 
-static int set_friend_statusmessage(const Messenger *m, int32_t friendnumber, const uint8_t *status, uint16_t length)
+int set_friend_statusmessage(const Messenger *m, int32_t friendnumber, const uint8_t *status, uint16_t length)
 {
     if (friend_not_valid(m, friendnumber))
         return -1;
@@ -939,7 +946,7 @@ static int set_friend_statusmessage(const Messenger *m, int32_t friendnumber, co
     return 0;
 }
 
-static void set_friend_userstatus(const Messenger *m, int32_t friendnumber, uint8_t status)
+void set_friend_userstatus(const Messenger *m, int32_t friendnumber, uint8_t status)
 {
     m->friendlist[friendnumber].userstatus = status;
 }
@@ -2765,7 +2772,9 @@ static int friends_list_load(Tox *tox, const uint8_t *data, uint32_t length)
                 }
             } else if (temp.status != 0) {
                 /* TODO: This is not a good way to do this. */
-                /* TODO: Do we want to add devices for unconfirmed friends? */
+                /* TODO: Do we want to add devices for unconfirmed friends?
+                    -- Yes, that why if the "primary" device isn't online, you can manually add a 2nd device and still
+                       connect to that friend */
                 uint8_t address[FRIEND_ADDRESS_SIZE];
                 id_copy(address, temp.real_pk[0]);
                 memcpy(address + crypto_box_PUBLICKEYBYTES, &(temp.friendrequest_nospam), sizeof(uint32_t));

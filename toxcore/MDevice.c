@@ -463,7 +463,7 @@ static int actually_send_friend_list(Tox *tox, uint32_t dev_num)
     uint8_t packet[sizeof(uint8_t) * 2 + sizeof(uint8_t) * crypto_box_PUBLICKEYBYTES];
 
     for (i = 0; i < tox->m->numfriends; ++i) {
-        if (tox->m->friendlist[i].status < FRIEND_REQUESTED) {
+        if (!tox->m->friendlist[i].status) {
             /* Currently we sync all friends who we've send a friend request to.
                Q: do we want to be "< FRIEND_CONFIRMED?"  So we only send to
                   confirmed friends?

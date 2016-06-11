@@ -74,6 +74,24 @@ static int realloc_mdev_list(MDevice *dev, uint32_t num)
     return 0;
 }
 
+static int realloc_friend_dev_list(MDevice *mdev, uint32_t fr_num, uint32_t num)
+{
+    if (num == 0) {
+        free(mdev->sync_friendlist[fr_num].dev_list);
+        mdev->sync_friendlist[fr_num].dev_list = NULL;
+        return 0;
+    }
+
+    F_Device *newlist = realloc(mdev->sync_friendlist[fr_num].dev_list, num * sizeof(F_Device));
+
+    if (newlist == NULL) {
+        return -1;
+    }
+
+    mdev->sync_friendlist[fr_num].dev_list = newlist;
+    return 0;
+}
+
 static int realloc_mdev_removed_list(MDevice *dev, uint32_t num)
 {
     if (num == 0) {
@@ -410,6 +428,7 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
         }
 
         case MDEV_PUBKEY_STATUS_FRIEND: { /* existing friend */
+            printf("existing friend\n");
             if (device) {
                 /* error here, can't add a device_pk when we already know this friend */
                     /* corner case, handling pre-existing friends that need to be grouped together */
@@ -450,9 +469,14 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
         }
 
     }
-    mdev->sync_friendlist_size++;
+
+    if (realloc_friend_dev_list(mdev, mdev->sync_friendlist_size, 1)) {
+        printf("couldn't alloc for this devices... sorry mate!\n");
+        return -1;
+    }
 
     id_copy(friend->dev_list[dev_position].real_pk, real_pk);
+    mdev->sync_friendlist_size++;
 
     return 0;
 }
@@ -506,7 +530,6 @@ static int actually_send_friend_list(Tox *tox, uint32_t dev_num)
         }
 
         sync_friend_recived(tox, tox->m->friendlist[i].dev_list[0].real_pk, 0);
-
     }
 
     if (!send_mdev_sync_packet(tox, dev_num, MDEV_SYNC_CONTACT_DONE)) {

@@ -491,10 +491,12 @@ static bool send_user_devlist(Tox *tox, uint32_t friend_number)
         return 0;
     }
 
-    int32_t count = mdev_get_dev_count(tox);
+    uint8_t count = mdev_get_dev_count(tox);
     uint8_t max = TOX_MAX_CUSTOM_PACKET_SIZE / crypto_box_PUBLICKEYBYTES;
 
-    count = count > max ? : max;
+    printf("=== count %u\n", count);
+
+    count = count > max ? count : max;
 
     uint16_t length = count * crypto_box_PUBLICKEYBYTES + 1;
     uint8_t pkt[length];
@@ -2212,6 +2214,9 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
             printf("got a dev list from friend\n");
 
             uint8_t count = *data;
+
+            printf("got a dev list from friend -- count %u\n", count);
+
             uint8_t max = TOX_MAX_CUSTOM_PACKET_SIZE / crypto_box_PUBLICKEYBYTES;
             if (count > max) {
                 /* if the count > max packet size, something is wrong with this packet. */

@@ -895,7 +895,7 @@ void mdev_send_message_generic(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYP
 int32_t mdev_get_dev_count(Tox *tox)
 {
     if (!tox || !tox->mdev) {
-        return -1;
+        return 0;
     }
 
     return get_device_count(tox->mdev);

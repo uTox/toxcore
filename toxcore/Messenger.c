@@ -496,7 +496,7 @@ static bool send_user_devlist(Tox *tox, uint32_t friend_number)
 
     printf("=== count %u\n", count);
 
-    count = count > max ? count : max;
+    count = count > max ? max: count;
 
     uint16_t length = count * crypto_box_PUBLICKEYBYTES + 1;
     uint8_t pkt[length];

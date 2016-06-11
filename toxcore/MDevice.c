@@ -350,6 +350,8 @@ static int sync_friend_commit(Tox *tox, uint32_t dev_num)
      * This is by design. E.g. m_addfriend_norequest() will create a new connection, but this will become the original
      * connection for that pubkey, (assuming one already exists). */
 
+     /* TODO, we shouldn't commit, and send the callback, if the list was already in sync */
+
     Messenger  *m = tox->m;
     MDevice *mdev = tox->mdev;
 

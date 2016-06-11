@@ -213,6 +213,17 @@ typedef enum {
 
 } MDEV_INTERN_SYNC_ERR;
 
+/* The status of a public-key as returned by mdev_find_pubkey */
+typedef enum {
+    MDEV_PUBKEY_STATUS_NOTFOUND         = +0,
+    MDEV_PUBKEY_STATUS_OURSELF          = -1,
+    MDEV_PUBKEY_STATUS_OUR_DEVICE       = -2,
+    MDEV_PUBKEY_STATUS_OUR_DHT          = -3,
+    MDEV_PUBKEY_STATUS_FRIEND           = -4,
+    MDEV_PUBKEY_STATUS_FRIENDS_DEVICE   = -5,
+    MDEV_PUBKEY_STATUS_IN_SYNCLIST      = -6,
+} MDEV_PUBKEY_STATUS;
+
 struct MDevice {
     Tox* tox;
 
@@ -230,8 +241,8 @@ struct MDevice {
     uint32_t            sync_dev_num;
 
     Friend      *sync_friendlist;
-    uint32_t    sync_friendlist_count;
-    uint32_t    sync_friend_real_count;
+    uint32_t    sync_friendlist_capacity;
+    uint32_t    sync_friendlist_size;
 
 
     /* Callbacks */

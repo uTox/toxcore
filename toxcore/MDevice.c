@@ -366,7 +366,8 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
 
     /* DEBUGING REMOVE ME */
     printf("they sent us a friend : hexid \n\t");
-    for(int i = 0; i < crypto_box_PUBLICKEYBYTES; ++i) {
+    uint16_t i;
+    for (i = 0; i < crypto_box_PUBLICKEYBYTES; ++i) {
         printf("%02X", real_pk[i]);
     }
     printf("\n");
@@ -805,7 +806,9 @@ bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length)
         return 0;
     }
 
-    for (int i = 0; i <= tox->mdev->devices_count; ++i) {
+    int i;
+
+    for (i = 0; i <= tox->mdev->devices_count; ++i) {
         send_mdev_packet(tox, i, packet, length + 2);
     }
 
@@ -824,7 +827,9 @@ bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t len
         return 0;
     }
 
-    for (int i = 0; i <= tox->mdev->devices_count; ++i) {
+    int i;
+
+    for (i = 0; i <= tox->mdev->devices_count; ++i) {
         send_mdev_packet(tox, i, packet, length + 2);
     }
 

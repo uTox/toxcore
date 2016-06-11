@@ -2676,8 +2676,8 @@ struct SAVED_OLDFRIEND {
 
 static uint32_t count_devices(const Messenger *m)
 {
-    uint32_t total = 0;
-    for (uint32_t i = 0; i < m->numfriends; ++i) {
+    uint32_t i, total = 0;
+    for (i = 0; i < m->numfriends; ++i) {
         if (m->friendlist[i].status > 0) {
             total += m->friendlist[i].dev_count;
         }

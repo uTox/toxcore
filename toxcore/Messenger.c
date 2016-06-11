@@ -2228,7 +2228,8 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
                 if (i * crypto_box_PUBLICKEYBYTES > (data_length -1 )) {
                     break;
                 }
-                m_add_device_to_friend_confirmed(tox, &data[i * crypto_box_PUBLICKEYBYTES], friend_num);
+
+                m_add_device_to_friend_confirmed(tox, &data[1 + i * crypto_box_PUBLICKEYBYTES], friend_num);
             }
 
             break;

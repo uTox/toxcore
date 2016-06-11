@@ -407,7 +407,7 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
 
 
     /* DEBUGING REMOVE ME */
-    printf("they sent us a friend : hexid \n\t");
+    printf("they sent us a friend : hexid : ");
     uint16_t i;
     for (i = 0; i < crypto_box_PUBLICKEYBYTES; ++i) {
         printf("%02X", real_pk[i]);

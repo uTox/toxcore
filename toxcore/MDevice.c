@@ -44,6 +44,8 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 /******************************************************************************
  ******** Multi-device internal helpers                                ********
  ******************************************************************************/
+static int get_device_id(MDevice *dev, const uint8_t *real_pk);
+
 static int realloc_mdev_list(MDevice *dev, uint32_t num)
 {
     if (num == 0) {
@@ -120,26 +122,34 @@ static int send_online_packet(Tox *tox, int32_t dev_num, int32_t unused)
 
 static int mdev_find_pubkey(Tox *tox, uint8_t *real_pk)
 {
-    /* TODO, this NEEDS an enum! */
-
-    /* if is our key return 1 */
-    /* if is one of our devices return 2 */
-
-    /* if is our DHT key return 3 */
+    if (public_key_cmp(real_pk, tox->net_crypto->self_public_key) == 0) {
+        return MDEV_PUBKEY_STATUS_OURSELF;
+    } else if (get_device_id(tox->mdev, real_pk) != -1) {
+        return MDEV_PUBKEY_STATUS_OUR_DEVICE;
+    } else if (public_key_cmp(real_pk, tox->dht->self_public_key) == 0) {
+        return MDEV_PUBKEY_STATUS_OUR_DHT;
+    }
 
     if (getfriend_id(tox->m, real_pk) != -1) {
         if (getfriend_devid(tox->m, real_pk)) {
-            return 5;
+            return MDEV_PUBKEY_STATUS_FRIENDS_DEVICE;
         }
-        return 4;
+        return MDEV_PUBKEY_STATUS_FRIEND;
     }
 
-    /* if already in the sync list, return 6 */
+    /* Check if already in the sync list */
+    for (size_t fid=0; fid<tox->mdev->sync_friendlist_size; ++fid) {
+        Friend *f = &tox->mdev->sync_friendlist[fid];
+        for (size_t did=0; did<f->dev_count; ++did) {
+            if (id_equal(real_pk, f->dev_list[did].real_pk))
+                return MDEV_PUBKEY_STATUS_IN_SYNCLIST;
+        }
+    }
 
-    /* any place else? */
+    /* TODO: any place else to check? */
 
-    /* Key not found, return 0 */
-    return 0;
+    /* Key not found */
+    return MDEV_PUBKEY_STATUS_NOTFOUND;
 }
 
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status);
@@ -236,7 +246,7 @@ static int init_sync(Tox *tox, uint32_t dev_num)
 
     tox->mdev->sync_status  = MDEV_SYNC_STATUS_ACTIVE;
     tox->mdev->sync_dev_num = dev_num;
-    tox->mdev->sync_friend_real_count = 0;
+    tox->mdev->sync_friendlist_size = 0;
 
     uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(tox->uptime) ];
 
@@ -267,8 +277,8 @@ static int decon_sync(MDevice *mdev, uint32_t dev_num)
 
     free(mdev->sync_friendlist);
     mdev->sync_friendlist           = NULL;
-    mdev->sync_friend_real_count    = 0;
-    mdev->sync_friendlist_count     = 0;
+    mdev->sync_friendlist_size    = 0;
+    mdev->sync_friendlist_capacity     = 0;
 
     return 0;
 }
@@ -321,7 +331,7 @@ static int sync_friend_commit(Tox *tox, uint32_t dev_num)
 
     uint32_t i;
 
-    for (i = 0; i < mdev->sync_friend_real_count; ++i) {
+    for (i = 0; i < mdev->sync_friendlist_size; ++i) {
 
         Friend *temp = &mdev->sync_friendlist[i];
 
@@ -376,19 +386,19 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
      * This will be very interesting to maintain... */
 
 
-    Friend *friend = &mdev->sync_friendlist[mdev->sync_friend_real_count];
+    Friend *friend = &mdev->sync_friendlist[mdev->sync_friendlist_size];
     uint32_t dev_position = 0;
 
 
     switch (mdev_find_pubkey(tox, real_pk)) {
-        case 1:
-        case 2:
-        case 3: {
+        case MDEV_PUBKEY_STATUS_OURSELF:
+        case MDEV_PUBKEY_STATUS_OUR_DEVICE:
+        case MDEV_PUBKEY_STATUS_OUR_DHT: {
             /* we can't work with this PK for ... reasons */
             return -1;
         }
 
-        case 4: { /* existing friend */
+        case MDEV_PUBKEY_STATUS_FRIEND: { /* existing friend */
             if (device) {
                 /* error here, can't add a device_pk when we already know this friend */
                     /* corner case, handling pre-existing friends that need to be grouped together */
@@ -408,7 +418,7 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
             break;
         }
 
-        case 5: {
+        case MDEV_PUBKEY_STATUS_FRIENDS_DEVICE: {
             /* existing device */
             if (!device) {
                 /* A friend already controls this device, but our peer says this is only a friend */
@@ -418,18 +428,18 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
             dev_position = getfriend_devid(m, real_pk);
 
             /* We're going to increment, but shouldn't on devices, so let's cheat a bit */
-            tox->mdev->sync_friend_real_count--;
+            tox->mdev->sync_friendlist_size--;
             break;
         }
 
-        case 6: {
+        case MDEV_PUBKEY_STATUS_IN_SYNCLIST: {
             /* this is a duplicate pub key */
             return -1;
             /* TODO different return number? */
         }
 
     }
-    mdev->sync_friend_real_count++;
+    mdev->sync_friendlist_size++;
 
     id_copy(friend->dev_list[dev_position].real_pk, real_pk);
 

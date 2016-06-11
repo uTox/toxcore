@@ -268,6 +268,12 @@ int mdev_add_new_device_self(Tox *tox, const uint8_t* name, size_t length, const
 /* Removes a device and adds it to the removed_devices blacklist */
 int mdev_remove_device(Tox* tox, const uint8_t *address);
 
+/** returns the count of active devices in the device list. */
+int32_t mdev_get_dev_count(Tox *tox);
+
+/** returns true on success, if devices exists, pk is set the the real_pk at that device index */
+bool mdev_get_dev_pubkey(Tox *tox, uint32_t number, uint8_t pk[crypto_box_PUBLICKEYBYTES]);
+
 /* Multi-device set callbacks */
 void mdev_callback_self_name_change(Tox *tox,
                                    void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),

@@ -484,6 +484,33 @@ static int32_t m_add_device_to_friend_confirmed(Tox *tox, const uint8_t *real_pk
     return init_new_device_friend(tox, friend_number, real_pk, FDEV_CONFIRMED);
 }
 
+/* returns true if successful */
+static bool send_user_devlist(Tox *tox, uint32_t friend_number)
+{
+    if (!tox->mdev) {
+        return 0;
+    }
+
+    uint32_t count = mdev_get_dev_count(tox);
+    uint8_t max = TOX_MAX_CUSTOM_PACKET_SIZE / crypto_box_PUBLICKEYBYTES;
+
+    count = count > max ? : max;
+
+    uint16_t length = count * crypto_box_PUBLICKEYBYTES + 1;
+    uint8_t pkt[length];
+    pkt[0] = count;
+
+    uint8_t i;
+    for (i = 0; i < count; ++i) {
+        uint8_t temp[crypto_box_PUBLICKEYBYTES] = {0};
+        if (mdev_get_dev_pubkey(tox, i, temp)) {
+            id_copy(&pkt[1 + i * crypto_box_PUBLICKEYBYTES], temp);
+        }
+    }
+
+    return write_cryptpacket_id(tox, friend_number, PACKET_ID_MSGR_DEV_LIST, pkt, length, 0);
+}
+
 static int clear_receipts(Messenger *m, int32_t friendnumber)
 {
     if (friend_not_valid(m, friendnumber))
@@ -612,7 +639,7 @@ int m_delfriend(Tox *tox, int32_t friendnumber)
     return 0;
 }
 
-/* This probable shouldn't be static, so we can call this from the client */
+/* This probable shouldn't be static, so we can call this from the client/tox.c */
 static int m_delete_device_from_friend(Tox *tox, const uint8_t *real_pk, uint32_t friend_number)
 {
     /* do stuff */
@@ -1180,7 +1207,8 @@ static int write_cryptpacket_id(const Tox *tox, int32_t friendnumber, uint8_t pa
         memcpy(packet + 1, data, length);
 
     return write_cryptpacket(tox->net_crypto, toxconn_crypt_connection_id(tox->m->fr_c,
-                             tox->m->friendlist[friendnumber].dev_list[0].friendcon_id), packet, length + 1, congestion_control) != -1;
+                             tox->m->friendlist[friendnumber].dev_list[0].friendcon_id),
+                             packet, length + 1, congestion_control) != -1;
 }
 
 /**********GROUP CHATS************/
@@ -2181,9 +2209,14 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
                 break;
             }
 
+            printf("got a dev list from friend\n");
+
             uint8_t count = *data;
             uint8_t max = TOX_MAX_CUSTOM_PACKET_SIZE / crypto_box_PUBLICKEYBYTES;
-            count = (count > max ? max : count);
+            if (count > max) {
+                /* if the count > max packet size, something is wrong with this packet. */
+                break;
+            }
 
             uint32_t i;
             for (i = 0; i < count; ++i) {
@@ -2486,6 +2519,12 @@ void do_friends(Tox *tox)
             if (tox->m->friendlist[i].user_istyping_sent == 0) {
                 if (send_user_istyping(tox, i, tox->m->friendlist[i].user_istyping))
                     tox->m->friendlist[i].user_istyping_sent = 1;
+            }
+
+            if (tox->mdev && tox->m->friendlist[i].user_devicelist_sent == 0) {
+                if (send_user_devlist(tox, i)) {
+                    tox->m->friendlist[i].user_devicelist_sent = 1;
+                }
             }
 
             check_friend_tcp_udp(tox, i);

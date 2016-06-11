@@ -18,24 +18,24 @@
 
 uint32_t toxmd_version_major(void)
 {
-    return TOX_VERSION_MAJOR;
+    return TOXMD_VERSION_MAJOR;
 }
 
 uint32_t toxmd_version_minor(void)
 {
-    return TOX_VERSION_MINOR;
+    return TOXMD_VERSION_MINOR;
 }
 
 uint32_t toxmd_version_patch(void)
 {
-    return TOX_VERSION_PATCH;
+    return TOXMD_VERSION_PATCH;
 }
 
 bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
 {
-  return (TOX_VERSION_MAJOR == major && /* Force the major version */
-            (TOX_VERSION_MINOR > minor || /* Current minor version must be newer than requested -- or -- */
-                (TOX_VERSION_MINOR == minor && TOX_VERSION_PATCH >= patch) /* the patch must be the same or newer */
+  return (TOXMD_VERSION_MAJOR == major && /* Force the major version */
+            (TOXMD_VERSION_MINOR > minor || /* Current minor version must be newer than requested -- or -- */
+                (TOXMD_VERSION_MINOR == minor && TOXMD_VERSION_PATCH >= patch) /* the patch must be the same or newer */
             )
          );
 }
@@ -45,6 +45,17 @@ bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
  ******** Multi-device internal helpers                                ********
  ******************************************************************************/
 static int get_device_id(MDevice *dev, const uint8_t *real_pk);
+
+static uint32_t get_device_count(const MDevice *dev)
+{
+    uint32_t i, count = 0;
+    for (i = 0; i < dev->devices_count; ++i) {
+        if (dev->devices[i].status) {
+            ++count;
+        }
+    }
+    return count;
+}
 
 static int realloc_mdev_list(MDevice *dev, uint32_t num)
 {
@@ -851,6 +862,42 @@ void mdev_send_message_generic(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYP
                                size_t length)
 {
     return;
+}
+
+
+/******************************************************************************
+ ******** Multi-device Public API functions                            ********
+ ******************************************************************************/
+int32_t mdev_get_dev_count(Tox *tox)
+{
+    if (!tox || !tox->mdev) {
+        return -1;
+    }
+
+    return get_device_count(tox->mdev);
+}
+
+/* returns 1 on success, and 0 on failure */
+bool mdev_get_dev_pubkey(Tox *tox, uint32_t number, uint8_t pk[crypto_box_PUBLICKEYBYTES])
+{
+    if (!tox || !tox->mdev) {
+        return 0;
+    }
+
+    if (!pk) {
+        return 0;
+    }
+
+    if (number > tox->mdev->devices_count - 1) {
+        return 0;
+    }
+
+    if (tox->mdev->devices[number].status) {
+        id_copy(pk, tox->mdev->devices[number].real_pk);
+        return 1;
+    }
+
+    return 0;
 }
 
 

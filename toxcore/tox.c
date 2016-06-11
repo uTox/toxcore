@@ -823,7 +823,8 @@ uint32_t tox_friend_add_device(Tox *tox, const uint8_t *address, uint32_t friend
     }
 
     set_friend_dev_error(ret, error);
-    return UINT32_MAX;}
+    return UINT32_MAX;
+}
 
 uint32_t tox_friend_add_norequest(Tox *tox, const uint8_t *public_key, TOX_ERR_FRIEND_ADD *error)
 {

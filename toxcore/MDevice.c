@@ -319,11 +319,13 @@ static int sync_friend_commit(Tox *tox, uint32_t dev_num)
     }
     m->numfriends = 0;
 
-    for (uint32_t i = 0; i < mdev->sync_friend_real_count; ++i) {
+    uint32_t i;
+
+    for (i = 0; i < mdev->sync_friend_real_count; ++i) {
 
         Friend *temp = &mdev->sync_friendlist[i];
 
-        int fnum = m_addfriend_norequest(tox, &temp->device[0].real_pk[0]);
+        int fnum = m_addfriend_norequest(tox, &temp->dev_list[0].real_pk[0]);
 
         if (fnum < 0) {
             /* TODO can re really just continue here? */
@@ -428,7 +430,7 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
     }
     mdev->sync_friend_real_count++;
 
-    id_copy(&friend->device[dev_position].real_pk[0], real_pk);
+    id_copy(friend->dev_list[dev_position].real_pk, real_pk);
 
     return 0;
 }
@@ -474,14 +476,14 @@ static int actually_send_friend_list(Tox *tox, uint32_t dev_num)
         packet[0] = PACKET_ID_MDEV_SYNC;
         packet[1] = MDEV_SYNC_CONTACT_APPEND;
 
-        memcpy(packet + 2, tox->m->friendlist[i].device[0].real_pk, crypto_box_PUBLICKEYBYTES);
+        memcpy(packet + 2, tox->m->friendlist[i].dev_list[0].real_pk, crypto_box_PUBLICKEYBYTES);
 
         if (!send_mdev_packet(tox, dev_num, packet, sizeof(packet))) {
             printf("ERROR sending MDEV_SYNC_CONTACT_APPEND packet \n");
             return -2;
         }
 
-        sync_friend_recived(tox, tox->m->friendlist[i].device[0].real_pk, 0);
+        sync_friend_recived(tox, tox->m->friendlist[i].dev_list[0].real_pk, 0);
 
     }
 

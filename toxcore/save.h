@@ -72,7 +72,7 @@ uint8_t *save_write_subheader(uint8_t *data, size_t len, uint16_t type, uint32_t
 /**
  * Size of a subheader written by `save_write_subheader`
  */
-inline size_t save_subheader_size() { return 2*sizeof(uint32_t); }
+static size_t save_subheader_size() { return 2*sizeof(uint32_t); }
 
 /**
  * Restores the state of `tox` and its optional components from the saved data

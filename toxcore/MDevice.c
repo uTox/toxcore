@@ -912,7 +912,7 @@ bool mdev_get_dev_pubkey(Tox *tox, uint32_t number, uint8_t pk[crypto_box_PUBLIC
         return 0;
     }
 
-    if (number > tox->mdev->devices_count - 1) {
+    if (!tox->mdev->devices_count || number > tox->mdev->devices_count - 1) {
         return 0;
     }
 

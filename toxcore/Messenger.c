@@ -491,7 +491,7 @@ static bool send_user_devlist(Tox *tox, uint32_t friend_number)
         return 0;
     }
 
-    uint32_t count = mdev_get_dev_count(tox);
+    int32_t count = mdev_get_dev_count(tox);
     uint8_t max = TOX_MAX_CUSTOM_PACKET_SIZE / crypto_box_PUBLICKEYBYTES;
 
     count = count > max ? : max;

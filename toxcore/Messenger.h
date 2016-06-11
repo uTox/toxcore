@@ -48,8 +48,12 @@ enum {
 #define PACKET_ID_ONLINE 24
 #define PACKET_ID_OFFLINE 25
 
-#define PACKET_ID_MDEV_SEND 30
-#define PACKET_ID_MDEV_SYNC 31
+#define PACKET_ID_MSGR_DEV_ADD  30
+#define PACKET_ID_MSGR_DEV_DEL  31
+#define PACKET_ID_MSGR_DEV_LIST 33
+
+#define PACKET_ID_MDEV_SEND 36
+#define PACKET_ID_MDEV_SYNC 37
 
 #define PACKET_ID_NICKNAME 48
 #define PACKET_ID_STATUSMESSAGE 49
@@ -268,7 +272,7 @@ struct Messenger {
     USERSTATUS userstatus;
 
     Friend *friendlist;
-    uint32_t numfriends;
+    uint32_t numfriends; /* This is the size of the friendlist array, not the actual number of friends */
 
     #define NUM_SAVED_TCP_RELAYS 8
     uint8_t has_added_relays; // If the first connection has occurred in do_messenger

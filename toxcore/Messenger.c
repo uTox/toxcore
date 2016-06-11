@@ -612,6 +612,14 @@ int m_delfriend(Tox *tox, int32_t friendnumber)
     return 0;
 }
 
+/* This probable shouldn't be static, so we can call this from the client */
+static int m_delete_device_from_friend(Tox *tox, const uint8_t *real_pk, uint32_t friend_number)
+{
+    /* do stuff */
+
+    return 0;
+}
+
 int m_get_friend_connectionstatus(const Tox *tox, int32_t friendnumber)
 {
     Messenger *m = tox->m;
@@ -2149,6 +2157,45 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
             set_device_status(m, friend_num, device_id, FDEV_CONFIRMED);
             break;
         }
+
+        case PACKET_ID_MSGR_DEV_ADD: {
+            if (data_length != crypto_box_PUBLICKEYBYTES) {
+                break;
+            }
+
+            break;
+        }
+
+        case PACKET_ID_MSGR_DEV_DEL: {
+            if (data_length != crypto_box_PUBLICKEYBYTES) {
+                break;
+            }
+
+            /* todo, handle the errors here somehow */
+            m_delete_device_from_friend(tox, data, friend_num);
+            break;
+        }
+
+        case PACKET_ID_MSGR_DEV_LIST: {
+            if (((data_length -1) % crypto_box_PUBLICKEYBYTES) != 0) {
+                break;
+            }
+
+            uint8_t count = *data;
+            uint8_t max = TOX_MAX_CUSTOM_PACKET_SIZE / crypto_box_PUBLICKEYBYTES;
+            count = (count > max ? max : count);
+
+            uint32_t i;
+            for (i = 0; i < count; ++i) {
+                if (i * crypto_box_PUBLICKEYBYTES > (data_length -1 )) {
+                    break;
+                }
+                m_add_device_to_friend_confirmed(tox, &data[i * crypto_box_PUBLICKEYBYTES], friend_num);
+            }
+
+            break;
+        }
+
 
         case PACKET_ID_NICKNAME: {
             if (data_length > MAX_NAME_LENGTH)

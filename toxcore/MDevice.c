@@ -167,9 +167,10 @@ static int mdev_find_pubkey(Tox *tox, uint8_t *real_pk)
     }
 
     /* Check if already in the sync list */
-    for (size_t fid=0; fid<tox->mdev->sync_friendlist_size; ++fid) {
+    size_t fid, did;
+    for (fid = 0; fid<tox->mdev->sync_friendlist_size; ++fid) {
         Friend *f = &tox->mdev->sync_friendlist[fid];
-        for (size_t did=0; did<f->dev_count; ++did) {
+        for (did = 0; did<f->dev_count; ++did) {
             if (id_equal(real_pk, f->dev_list[did].real_pk))
                 return MDEV_PUBKEY_STATUS_IN_SYNCLIST;
         }

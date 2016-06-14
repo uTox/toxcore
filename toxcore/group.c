@@ -653,7 +653,7 @@ static int add_conn_to_groupchat(Group_Chats *g_c, int friendcon_id, int groupnu
     g->close[ind].number = friendcon_id;
     g->close[ind].closest = closest;
     //TODO
-    toxconn_set_callbacks(g_c->m->fr_c,
+    toxconn_set_callbacks(g_c->fr_c,
                           friendcon_id,
                           GROUPCHAT_CALLBACK_INDEX,
                           &handle_status,
@@ -1307,7 +1307,7 @@ static void handle_friend_invite_packet(Tox *tox, uint32_t friendnumber, const u
 
             int friendcon_id = getfriendcon_id(tox, friendnumber);
             uint8_t real_pk[crypto_box_PUBLICKEYBYTES], temp_pk[crypto_box_PUBLICKEYBYTES];
-            toxconn_get_public_keys(real_pk, temp_pk, g_c->fr_c, friendcon_id);
+            toxconn_get_public_keys(real_pk, temp_pk, tox->tox_conn, friendcon_id);
 
             addpeer(g_c, groupnum, real_pk, temp_pk, peer_number);
             int close_index = add_conn_to_groupchat(g_c, friendcon_id, groupnum, 0, 1);
@@ -2246,7 +2246,7 @@ Group_Chats *new_groupchats(Tox *tox)
 
     temp->m = tox->m;
     temp->tox = tox;
-    temp->fr_c = tox->m->fr_c;
+    temp->fr_c = tox->tox_conn;
     tox->gc = temp;
     m_callback_group_invite(tox, &handle_friend_invite_packet);
 

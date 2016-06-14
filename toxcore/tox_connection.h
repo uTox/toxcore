@@ -104,7 +104,7 @@ typedef struct {
 } Tox_Conn;
 
 
-typedef struct {
+typedef struct Tox_Connections {
     Net_Crypto *net_crypto;
     DHT *dht;
     Onion_Client *onion_c;

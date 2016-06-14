@@ -262,9 +262,9 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
-    tox->onion   = new_onion(tox->dht);
-    tox->onion_a = new_onion_announce(tox->dht);
-    tox->onion_c = new_onion_client(tox->net_crypto);
+    tox->onion    = new_onion(tox->dht);
+    tox->onion_a  = new_onion_announce(tox->dht);
+    tox->onion_c  = new_onion_client(tox->net_crypto);
 
     if (!(tox->onion && tox->onion_a && tox->onion_c)) {
         kill_onion(tox->onion);
@@ -276,6 +276,8 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         free(tox);
         return NULL;
     }
+
+    tox->tox_conn = new_tox_conns(tox->onion_c);
 
     Messenger *m = new_messenger(tox, &m_options, &m_error);
     if (!m) {
@@ -477,7 +479,8 @@ uint32_t tox_iteration_interval(const Tox *tox)
 
 void tox_iterate(Tox *tox)
 {
-    do_multidevice(tox->mdev);
+    do_tox_connections(tox->tox_conn);
+    do_multidevice(tox);
     do_messenger(tox);
     do_groupchats(tox->gc);
 }

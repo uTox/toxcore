@@ -569,6 +569,7 @@ typedef struct ToxAV            ToxAV;
 
 typedef struct Networking_Core  Networking_Core;
 typedef struct Net_Crypto       Net_Crypto;
+typedef struct Tox_Connections  Tox_Connections;
 typedef struct DHT              DHT;
 
 typedef struct Onion            Onion;
@@ -583,7 +584,7 @@ struct Tox {
 
     Networking_Core *net;
     Net_Crypto      *net_crypto;
-
+    Tox_Connections *tox_conn;
     DHT             *dht;
 
     Onion           *onion;

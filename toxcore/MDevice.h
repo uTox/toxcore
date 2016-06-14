@@ -227,8 +227,6 @@ typedef enum {
 struct MDevice {
     Tox* tox;
 
-    Tox_Connections *dev_conns;
-
     Device          *devices;
     uint32_t        devices_count;
 
@@ -257,7 +255,7 @@ struct MDevice {
 typedef struct Tox Tox;
 
 /* TODO DOCUMENT THIS FXN */
-void do_multidevice(MDevice *dev);
+void do_multidevice(Tox *tox);
 
 /* TODO DOCUMENT THIS FXN */
 MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error);

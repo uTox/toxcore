@@ -31,11 +31,12 @@
 
 #include "logger.h"
 #include "Messenger.h"
+#include "MDevice.h"
 #include "network.h"
 #include "util.h"
 #include "save.h"
 
-static void set_friend_status(Tox *tox, int32_t friendnumber, uint8_t status);
+static void set_friend_status(Tox *tox, int32_t friendnumber, int32_t dev_id, uint8_t status);
 static void set_device_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status);
 static int write_cryptpacket_id(const Tox *tox, int32_t friendnumber, uint8_t packet_id, const uint8_t *data,
                                 uint32_t length, uint8_t congestion_control);
@@ -306,6 +307,7 @@ static int32_t init_new_device_friend(Tox *tox, uint32_t friend_number, const ui
 
                 if (toxconn_is_connected(tox->tox_conn, friendcon_id) == TOXCONN_STATUS_CONNECTED) {
                     friend->dev_list[i].status = FDEV_ONLINE;
+                    friend->status = FRIEND_ONLINE;
                     send_online_packet(tox, friend_number, i);
                 }
                 return i;
@@ -1142,6 +1144,7 @@ static void check_friend_connectionstatus(Tox *tox, int32_t friendnumber, uint8_
             break_files(tox->m, friendnumber);
             clear_receipts(tox->m, friendnumber);
         } else {
+            /* Friend just came online, reset every variable we need to send them */
             tox->m->friendlist[friendnumber].name_sent = 0;
             tox->m->friendlist[friendnumber].userstatus_sent = 0;
             tox->m->friendlist[friendnumber].statusmessage_sent = 0;
@@ -1159,8 +1162,16 @@ static void check_friend_connectionstatus(Tox *tox, int32_t friendnumber, uint8_
     check_friend_tcp_udp(tox, friendnumber);
 }
 
-void set_friend_status(Tox *tox, int32_t friendnumber, uint8_t status)
+void set_friend_status(Tox *tox, int32_t friendnumber, int32_t dev_id, uint8_t status)
 {
+    tox->m->friendlist[friendnumber].dev_list[dev_id].status = status;
+
+    /* TODO
+     *
+     * we have to loop through the devices, see which ones are connected,
+     * which are disconnected, and send the callbacks accordingly.
+     */
+
     check_friend_connectionstatus(tox, friendnumber, status);
     tox->m->friendlist[friendnumber].status = status;
     switch (status) {
@@ -1179,17 +1190,6 @@ void set_friend_status(Tox *tox, int32_t friendnumber, uint8_t status)
             tox->m->friendlist[friendnumber].dev_list[0].status = FDEV_ONLINE;
             break;
         }
-    }
-}
-
-void set_device_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status)
-{
-    m->friendlist[friendnumber].dev_list[device_id].status = status;
-
-    if (status == FDEV_CONFIRMED) {
-
-    } else if (status == FDEV_ONLINE) {
-
     }
 }
 
@@ -2123,7 +2123,8 @@ static void check_friend_request_timed_out(Tox *tox, uint32_t i, uint64_t t)
     Friend *f = &tox->m->friendlist[i];
 
     if (f->friendrequest_lastsent + f->friendrequest_timeout < t) {
-        set_friend_status(tox, i, FRIEND_ADDED);
+        /* We can assume devices 0 here for now. We don't send or sync friend requests through mdev yet. */
+        set_friend_status(tox, i, 0, FRIEND_ADDED);
         /* Double the default timeout every time if friendrequest is assumed
          * to have been sent unsuccessfully.
          */
@@ -2136,11 +2137,11 @@ static int handle_status(void *object, int friend_id, int device_id, uint8_t sta
     Tox *tox = object;
 
     if (status) { /* Went online. */
-        set_device_status(tox->m, friend_id, device_id, FDEV_ONLINE);
+        set_friend_status(tox, friend_id, device_id, FDEV_ONLINE);
         send_online_packet(tox, friend_id, device_id);
     } else { /* Went offline. */
         if (tox->m->friendlist[friend_id].status == FRIEND_ONLINE) {
-            set_device_status(tox->m, friend_id, device_id, FDEV_CONFIRMED);
+            set_friend_status(tox, friend_id, device_id, FDEV_CONFIRMED);
         }
     }
 
@@ -2160,8 +2161,7 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
 
     if (m->friendlist[friend_num].status != FRIEND_ONLINE) {
         if (packet_id == PACKET_ID_ONLINE && len == 1) {
-            set_friend_status( tox, friend_num, FRIEND_ONLINE);
-            set_device_status( tox->m, friend_num, device_id, FDEV_ONLINE);
+            set_friend_status(tox, friend_num, device_id, FRIEND_ONLINE);
             send_online_packet(tox, friend_num, device_id);
         } else {
             return -1;
@@ -2173,7 +2173,7 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
             if (len != 1) {
                 return -1;
             }
-            set_device_status(m, friend_num, device_id, FDEV_ONLINE);
+            set_friend_status(tox, friend_num, device_id, FDEV_ONLINE);
             send_online_packet(tox, friend_num, device_id);
             break;
         }
@@ -2181,7 +2181,7 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
             if (data_length != 0)
                 break;
 
-            set_device_status(m, friend_num, device_id, FDEV_CONFIRMED);
+            set_friend_status(tox, friend_num, device_id, FDEV_CONFIRMED);
             break;
         }
 
@@ -2484,7 +2484,8 @@ void do_friends(Tox *tox)
                                                tox->m->friendlist[i].info_size);
 
             if (fr >= 0) {
-                set_friend_status(tox, i, FRIEND_REQUESTED);
+                /* We can assume dev 0 here and in the above request pkt as mdev doesnt' sync pending friend nospam */
+                set_friend_status(tox, i, 0, FRIEND_REQUESTED);
                 tox->m->friendlist[i].friendrequest_lastsent = temp_time;
             }
         }

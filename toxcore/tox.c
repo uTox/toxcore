@@ -132,12 +132,6 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     if (!logger_get_global())
         logger_set_global(logger_new(LOGGER_OUTPUT_FILE, LOGGER_LEVEL, "toxcore"));
 
-    Tox *tox = calloc(1, sizeof(Tox));
-
-    if (!tox) {
-        printf("this shouldn't happen\nTODO: error handling");
-        /* TODO error handling here */
-    }
 
     Messenger_Options    m_options = {0};
     MDevice_Options   mdev_options = {0};
@@ -222,7 +216,13 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         }
     }
 
-    unsigned int m_error;
+    Tox *tox = calloc(1, sizeof(Tox));
+
+    if (!tox) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
+        return NULL;
+    }
+
 
     unsigned int net_err = 0;
 
@@ -239,7 +239,9 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         free(tox);
 
         if (error && net_err == 1) {
-            *error = MESSENGER_ERROR_PORT;
+            SET_ERROR_PARAMETER(error, TOX_ERR_NEW_PORT_ALLOC);
+        } else {
+            SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         }
 
         return NULL;
@@ -250,6 +252,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     if (tox->dht == NULL) {
         kill_networking(tox->net);
         free(tox);
+        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
     }
 
@@ -259,6 +262,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         kill_networking(tox->net);
         kill_DHT(tox->dht);
         free(tox);
+        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
     }
 
@@ -274,19 +278,24 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         kill_DHT(tox->dht);
         kill_networking(tox->net);
         free(tox);
+        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
     }
+
+    unsigned int m_error;
 
     tox->tox_conn = new_tox_conns(tox->onion_c);
 
     Messenger *m = new_messenger(tox, &m_options, &m_error);
     if (!m) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
     }
     tox->m = m;
 
     MDevice *mdev = new_mdevice(tox, &m_options, &m_error);
     if (!mdev) {
+        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
     }
     mdev->tox = tox;
@@ -316,7 +325,6 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
 
     unix_time_update();
-
     tox->uptime = unix_time();
 
     return tox;

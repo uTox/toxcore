@@ -292,8 +292,8 @@ void mdev_callback_self_status_message_change(Tox *tox,
 void mdev_callback_device_sent_message(Tox *tox, tox_device_sent_message_cb *callback, void *userdata);
 
 /* Multi-device send data fxns */
-bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length);
-bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t length);
+bool mdev_send_name_change(Tox *tox, const uint8_t *name, size_t length);
+bool mdev_send_status_message_change(Tox *tox, const uint8_t *status, size_t length);
 
 
 /* TODO DOCUMENT THIS FXN */

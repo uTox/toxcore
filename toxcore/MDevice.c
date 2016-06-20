@@ -126,7 +126,7 @@ static bool get_next_device_online(const MDevice *mdev, uint32_t *device)
     }
 
     uint32_t i;
-    for (i = (*device) + 1; ++i < mdev->devices_count; ) {
+    for (i = (*device); ++i < mdev->devices_count; ) {
         if (mdev->devices[i].status == MDEV_ONLINE) {
             *device = i;
             return 1;
@@ -885,7 +885,7 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
 /******************************************************************************
  ******** Multi-device send data fxns                                  ********
  ******************************************************************************/
-bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length)
+bool mdev_send_name_change(Tox *tox, const uint8_t *name, size_t length)
 {
     uint8_t packet[length + 2];
 
@@ -905,7 +905,7 @@ bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length)
     return 1;
 }
 
-bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t length)
+bool mdev_send_status_message_change(Tox *tox, const uint8_t *status, size_t length)
 {
     uint8_t packet[length + 2];
 

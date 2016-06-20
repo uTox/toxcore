@@ -655,7 +655,7 @@ bool tox_self_set_name(Tox *tox, const uint8_t *name, size_t length, TOX_ERR_SET
         send_name_all_groups(tox->gc);
 
         /* TODO error checking here */
-        mdev_sync_name_change(tox, name, length);
+        mdev_send_name_change(tox, name, length);
 
         SET_ERROR_PARAMETER(error, TOX_ERR_SET_INFO_OK);
         return 1;
@@ -696,7 +696,7 @@ bool tox_self_set_status_message(Tox *tox, const uint8_t *status, size_t length,
     if (m_set_statusmessage(tox, status, length) == 0) {
 
         /* TODO error checking here */
-        mdev_sync_status_message_change(tox, status, length);
+        mdev_send_status_message_change(tox, status, length);
 
         SET_ERROR_PARAMETER(error, TOX_ERR_SET_INFO_OK);
         return 1;

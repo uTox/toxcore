@@ -293,7 +293,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
     tox->m = m;
 
-    MDevice *mdev = new_mdevice(tox, &m_options, &m_error);
+    MDevice *mdev = new_mdevice(tox, &mdev_options, &m_error);
     if (!mdev) {
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
@@ -612,6 +612,12 @@ bool tox_self_delete_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_DEL
     }
 }
 
+void tox_callback_device_sent_message(Tox *tox, tox_device_sent_message_cb *callback, void *userdata)
+{
+    mdev_callback_device_sent_message(tox, callback, userdata);
+}
+
+
 void tox_self_set_nospam(Tox *tox, uint32_t nospam)
 {
     set_nospam(tox->net_crypto, nospam);
@@ -657,7 +663,6 @@ bool tox_self_set_name(Tox *tox, const uint8_t *name, size_t length, TOX_ERR_SET
         SET_ERROR_PARAMETER(error, TOX_ERR_SET_INFO_TOO_LONG);
         return 0;
     }
-
 }
 
 size_t tox_self_get_name_size(const Tox *tox)
@@ -1131,7 +1136,7 @@ uint32_t tox_friend_send_message(Tox *tox, uint32_t friend_number, TOX_MESSAGE_T
     uint32_t message_id = 0;
     set_message_error(m_send_message_generic(tox, friend_number, type, message, length, &message_id), error);
 
-    if (tox->mdev && 0) { /* && 0 because friend numbers have to by insync... */
+    if (tox->mdev) {
         if (tox->mdev->options.send_messages) {
             mdev_send_message_generic(tox, friend_number, type, message, length);
         }

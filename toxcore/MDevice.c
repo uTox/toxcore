@@ -15,7 +15,6 @@
 /******************************************************************************
  ******** Multi Device Version Helpers                                 ********
  ******************************************************************************/
-
 uint32_t toxmd_version_major(void)
 {
     return TOXMD_VERSION_MAJOR;
@@ -74,21 +73,21 @@ static int realloc_mdev_list(MDevice *dev, uint32_t num)
     return 0;
 }
 
-static int realloc_friend_dev_list(MDevice *mdev, uint32_t fr_num, uint32_t num)
+static int realloc_friend_dev_list(MDevice *mdev, uint32_t dev_num, uint32_t fr_num, uint32_t num)
 {
     if (num == 0) {
-        free(mdev->sync_friendlist[fr_num].dev_list);
-        mdev->sync_friendlist[fr_num].dev_list = NULL;
+        free(mdev->devices[dev_num].sync_friendlist[fr_num].dev_list);
+        mdev->devices[dev_num].sync_friendlist[fr_num].dev_list = NULL;
         return 0;
     }
 
-    F_Device *newlist = realloc(mdev->sync_friendlist[fr_num].dev_list, num * sizeof(F_Device));
+    F_Device *newlist = realloc(mdev->devices[dev_num].sync_friendlist[fr_num].dev_list, num * sizeof(F_Device));
 
     if (newlist == NULL) {
         return -1;
     }
 
-    mdev->sync_friendlist[fr_num].dev_list = newlist;
+    mdev->devices[dev_num].sync_friendlist[fr_num].dev_list = newlist;
     return 0;
 }
 
@@ -118,6 +117,38 @@ static uint8_t mdev_device_not_valid(const MDevice *dev, uint32_t dev_num)
     }
 
     return 1;
+}
+
+static bool get_next_device_online(const MDevice *mdev, uint32_t *device)
+{
+    if (!device) {
+        return 0;
+    }
+
+    uint32_t i;
+    for (i = (*device) + 1; ++i < mdev->devices_count; ) {
+        if (mdev->devices[i].status == MDEV_ONLINE) {
+            *device = i;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static bool get_next_device_synced(const MDevice *mdev, uint32_t *device)
+{
+    if (!device) {
+        return 0;
+    }
+
+    uint32_t i;
+    for (i = *device; ++i < mdev->devices_count;) {
+        if (mdev->devices[i].status == MDEV_ONLINE && mdev->devices[i].sync_status == MDEV_SYNC_STATUS_DONE) {
+            *device = i;
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static int send_mdev_packet(Tox *tox, int32_t dev_num, uint8_t *packet, size_t length)
@@ -166,13 +197,17 @@ static int mdev_find_pubkey(Tox *tox, uint8_t *real_pk)
         return MDEV_PUBKEY_STATUS_FRIEND;
     }
 
-    /* Check if already in the sync list */
-    size_t fid, did;
-    for (fid = 0; fid<tox->mdev->sync_friendlist_size; ++fid) {
-        Friend *f = &tox->mdev->sync_friendlist[fid];
-        for (did = 0; did<f->dev_count; ++did) {
-            if (id_equal(real_pk, f->dev_list[did].real_pk))
-                return MDEV_PUBKEY_STATUS_IN_SYNCLIST;
+    /* Check if already any the sync list */
+    uint32_t dev = UINT32_MAX;
+    while (get_next_device_online(tox->mdev, &dev)) {
+        uint32_t fid, did;
+        for (fid = 0; fid < tox->mdev->devices[dev].sync_friendlist_size; ++fid) {
+            Friend *f = &tox->mdev->devices[dev].sync_friendlist[fid];
+            for (did = 0; did < f->dev_count; ++did) {
+                if (id_equal(real_pk, f->dev_list[did].real_pk)) {
+                    return MDEV_PUBKEY_STATUS_IN_SYNCLIST;
+                }
+            }
         }
     }
 
@@ -242,11 +277,8 @@ static void set_mdevice_status(MDevice *mdev, uint32_t dev_num, MDEV_STATUS stat
 {
     mdev->devices[dev_num].status = status;
 
-    mdev->sync_role     = 0;
-    mdev->sync_status   = 0;
-
     if (status == MDEV_CONFIRMED) {
-        /* TODO stuff here */
+        mdev->devices[dev_num].sync_status = 0;
     } else if (status == MDEV_ONLINE) {
         /* TODO stuff here */
     }
@@ -281,17 +313,20 @@ static int init_sync(Tox *tox, uint32_t dev_num)
         return -1;
     }
 
-    tox->mdev->sync_status  = MDEV_SYNC_STATUS_ACTIVE;
-    tox->mdev->sync_dev_num = dev_num;
-    tox->mdev->sync_friendlist_size = 0;
+    tox->mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_ACTIVE;
 
     uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(tox->uptime) ];
 
-    unix_time_update();
-
     packet[0] = PACKET_ID_MDEV_SYNC;
     packet[1] = MDEV_SYNC_META_UPTIME;
-    packet[2] = (unix_time() - tox->uptime);
+
+    unix_time_update();
+    uint64_t our_uptime = (unix_time() - tox->uptime);
+
+    uint8_t uptime[sizeof(uint64_t)];
+    memcpy(uptime, &our_uptime, sizeof(uint64_t));
+    host_to_net(uptime, sizeof(uint64_t));
+    memcpy(&packet[2], uptime, sizeof(uint64_t));
 
     return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
 }
@@ -300,22 +335,20 @@ static int init_sync(Tox *tox, uint32_t dev_num)
  *  successfully completes */
 static int decon_sync(MDevice *mdev, uint32_t dev_num)
 {
-    if (mdev->sync_dev_num == dev_num) {
-        if (mdev->sync_status && mdev->sync_status < MDEV_SYNC_STATUS_DONE ) {
-            /* Clean up the sync state here! */
-            /* FIXME TODO */
-
-        }
+    if (mdev->devices[dev_num].sync_status && mdev->devices[dev_num].sync_status != MDEV_SYNC_STATUS_DONE ) {
+        /* Clean up the sync state here! */
+        /* FIXME TODO */
+    } else {
+        mdev->devices[dev_num].sync_status = MDEV_SYNC_STATUS_DONE;
     }
 
-    mdev->sync_role     = MDEV_SYNC_ROLE_NONE;
-    mdev->sync_status   = MDEV_SYNC_STATUS_NONE;
-    mdev->sync_dev_num  = UINT32_MAX;
+    mdev->devices[dev_num].sync_role     = MDEV_SYNC_ROLE_NONE;
+    mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_NONE;
 
-    free(mdev->sync_friendlist);
-    mdev->sync_friendlist           = NULL;
-    mdev->sync_friendlist_size    = 0;
-    mdev->sync_friendlist_capacity     = 0;
+    free(mdev->devices[dev_num].sync_friendlist);
+    mdev->devices[dev_num].sync_friendlist           = NULL;
+    mdev->devices[dev_num].sync_friendlist_size      = 0;
+    mdev->devices[dev_num].sync_friendlist_capacity  = 0;
 
     return 0;
 }
@@ -342,7 +375,7 @@ static int request_friend_sync(Tox *tox, uint32_t dev_num)
         return -1;
     }
 
-    tox->mdev->sync_status = MDEV_SYNC_STATUS_FRIENDS_RECIVING;
+    tox->mdev->devices[dev_num].sync_status = MDEV_SYNC_STATUS_FRIENDS_RECIVING;
 
     return send_mdev_sync_packet(tox, dev_num, MDEV_SYNC_CONTACT_START);
 }
@@ -370,9 +403,9 @@ static int sync_friend_commit(Tox *tox, uint32_t dev_num)
 
     uint32_t i;
 
-    for (i = 0; i < mdev->sync_friendlist_size; ++i) {
+    for (i = 0; i < mdev->devices[dev_num].sync_friendlist_size; ++i) {
 
-        Friend *temp = &mdev->sync_friendlist[i];
+        Friend *temp = &mdev->devices[dev_num].sync_friendlist[i];
 
         /* TODO this will increment the lock count for this connection for this contact.
          * and I haven't verified that this is okay.
@@ -405,7 +438,7 @@ static int sync_friend_commit(Tox *tox, uint32_t dev_num)
 
 /** If @device is TRUE, it's an additional public_key/device for the last sent
  *  contact and not a new friend */
-static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
+static int sync_friend_recived(Tox *tox, uint32_t dev_num, uint8_t *real_pk, bool device)
 {
     if (!sync_allowed(tox, NULL)) {
         printf("unable to sync, this is bad\n");
@@ -418,7 +451,7 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
     /* I really wanted to do something simple here, but that's clearly not really an option :<
      * This will be very interesting to maintain... */
 
-    Friend *friend = &mdev->sync_friendlist[mdev->sync_friendlist_size];
+    Friend *friend = &mdev->devices[dev_num].sync_friendlist[mdev->devices[dev_num].sync_friendlist_size];
     uint32_t dev_position = 0;
 
 
@@ -461,7 +494,7 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
             dev_position = getfriend_devid(m, real_pk);
 
             /* We're going to increment, but shouldn't on devices, so let's cheat a bit */
-            tox->mdev->sync_friendlist_size--;
+            tox->mdev->devices[dev_num].sync_friendlist_size--;
             break;
         }
 
@@ -473,13 +506,13 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
 
     }
 
-    if (realloc_friend_dev_list(mdev, mdev->sync_friendlist_size, 1)) {
+    if (realloc_friend_dev_list(mdev, dev_num, mdev->devices[dev_num].sync_friendlist_size, 1)) {
         printf("couldn't alloc for this devices... sorry mate!\n");
         return -1;
     }
 
     id_copy(friend->dev_list[dev_position].real_pk, real_pk);
-    mdev->sync_friendlist_size++;
+    mdev->devices[dev_num].sync_friendlist_size++;
 
     return 0;
 }
@@ -488,12 +521,12 @@ static int sync_friend_recived(Tox *tox, uint8_t *real_pk, bool device)
  ******** Multi-device sync OUTGOING                                   ********
  ******************************************************************************/
 
- /** TODO DOCUMENT THIS FXN
-  *
-  *
-  *
-  *
-  *     */
+/** TODO DOCUMENT THIS FXN
+ *
+ *
+ *
+ *
+ */
 static int actually_send_friend_list(Tox *tox, uint32_t dev_num)
 {
     if (!sync_allowed(tox, NULL)) {
@@ -532,7 +565,7 @@ static int actually_send_friend_list(Tox *tox, uint32_t dev_num)
             return -2;
         }
 
-        sync_friend_recived(tox, tox->m->friendlist[i].dev_list[0].real_pk, 0);
+        sync_friend_recived(tox, dev_num, tox->m->friendlist[i].dev_list[0].real_pk, 0);
     }
 
     if (!send_mdev_sync_packet(tox, dev_num, MDEV_SYNC_CONTACT_DONE)) {
@@ -557,7 +590,6 @@ static int handle_status(void *object, int dev_num, int device_id, uint8_t statu
         init_sync(tox, dev_num);
     } else {
         set_mdevice_status(mdev, dev_num, MDEV_CONFIRMED);
-
         decon_sync(mdev, dev_num);
     }
     return 0;
@@ -622,6 +654,37 @@ static int handle_packet_send(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
 
             break;
         }
+
+        case MDEV_SEND_MESSAGE:
+        case MDEV_SEND_MESSAGE_ACTION: {
+            if (mdev->device_sent_message) {
+
+                if (length <= sizeof(uint32_t) + 1) {
+                    return -1;
+                }
+
+                uint32_t target;
+                uint8_t tmp_fr_num[sizeof(uint32_t)];
+                memcpy(tmp_fr_num, &pkt[1], sizeof(uint32_t));
+                host_to_net(tmp_fr_num, sizeof(uint32_t));
+                memcpy(&target, tmp_fr_num, sizeof(uint32_t));
+
+                bool type = (pkt[0] - MDEV_SEND_MESSAGE);
+
+                uint8_t *message = &pkt[1 + sizeof(uint32_t)];
+
+                size_t message_length = length - sizeof(uint32_t) - 1;
+
+                mdev->device_sent_message(tox, dev_num, target, type, message, message_length);
+            }
+
+            break;
+        }
+
+        default: {
+            printf("mdev packet_send with unsupported type %u\n", pkt[0]);
+            break;
+        }
     }
 
     return 0;
@@ -642,19 +705,25 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             }
 
             unix_time_update();
-
-            uint64_t them = pkt[1];
             uint64_t us   = (unix_time() - tox->uptime);
+
+            uint64_t them;
+
+            uint8_t them_time[sizeof(uint64_t)];
+            memcpy(them_time, &pkt[1], sizeof(uint64_t));
+            net_to_host(them_time, sizeof(uint64_t));
+            memcpy(&them, them_time, sizeof(uint64_t));
+
 
             printf("their uptime %lu our uptime %lu \n", them, us);
             /* TODO handle == differently */
             if (us > them) {
-                tox->mdev->sync_role    = MDEV_SYNC_ROLE_PRIMARY;
-                tox->mdev->sync_status  = MDEV_SYNC_STATUS_FRIENDS_SENDING;
+                tox->mdev->devices[dev_num].sync_role    = MDEV_SYNC_ROLE_PRIMARY;
+                tox->mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_FRIENDS_SENDING;
                 init_sync_friends(tox, dev_num);
             } else {
-                tox->mdev->sync_role    = MDEV_SYNC_ROLE_SECONDARY;
-                tox->mdev->sync_status  = MDEV_SYNC_STATUS_FRIENDS_RECIVING;
+                tox->mdev->devices[dev_num].sync_role    = MDEV_SYNC_ROLE_SECONDARY;
+                tox->mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_FRIENDS_RECIVING;
                 init_sync_friends(tox, dev_num);
             }
 
@@ -666,7 +735,7 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
                 return -1;
             }
 
-            if (!tox->mdev->sync_role) {
+            if (!tox->mdev->devices[dev_num].sync_role) {
                 printf("they're requesting a friend sync, but we don't have a role. this is bad\n");
             }
 
@@ -687,9 +756,9 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             uint32_t their_friend_count = pkt[1];
             printf("they have %u friends we have %u friends\n", their_friend_count, tox->m->numfriends);
             int total = their_friend_count + tox->m->numfriends;
-            tox->mdev->sync_friendlist = calloc(total, sizeof(Friend));
-            if (tox->mdev->sync_friendlist) {
-                if (tox->mdev->sync_role == MDEV_SYNC_ROLE_SECONDARY) {
+            tox->mdev->devices[dev_num].sync_friendlist = calloc(total, sizeof(Friend));
+            if (tox->mdev->devices[dev_num].sync_friendlist) {
+                if (tox->mdev->devices[dev_num].sync_role == MDEV_SYNC_ROLE_SECONDARY) {
                     request_friend_sync(tox, dev_num);
                 }
             } else {
@@ -709,7 +778,7 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             bool device = (pkt[0] == MDEV_SYNC_CONTACT_APPEND_DEVICE);
             uint8_t *pk = &pkt[1];
 
-            sync_friend_recived(tox, pk, device);
+            sync_friend_recived(tox, dev_num, pk, device);
             break;
         }
 
@@ -725,11 +794,11 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
         }
 
         case MDEV_SYNC_CONTACT_DONE: {
-            if (tox->mdev->sync_role == MDEV_SYNC_ROLE_SECONDARY) {
-                tox->mdev->sync_status = MDEV_SYNC_STATUS_FRIENDS_SENDING;
+            if (tox->mdev->devices[dev_num].sync_role == MDEV_SYNC_ROLE_SECONDARY) {
+                tox->mdev->devices[dev_num].sync_status = MDEV_SYNC_STATUS_FRIENDS_SENDING;
                 actually_send_friend_list(tox, dev_num);
-            } else if (tox->mdev->sync_role == MDEV_SYNC_ROLE_PRIMARY) {
-                tox->mdev->sync_status  = MDEV_SYNC_STATUS_DONE;
+            } else if (tox->mdev->devices[dev_num].sync_role == MDEV_SYNC_ROLE_PRIMARY) {
+                tox->mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_DONE;
                 if (send_mdev_sync_packet(tox, dev_num, MDEV_SYNC_CONTACT_COMMIT)){
                     sync_friend_commit(tox, dev_num);
                     if (tox->m->friend_list_change) {
@@ -746,7 +815,7 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
 
         case MDEV_SYNC_CONTACT_COMMIT: {
             printf("commit packet received, going to commit!\n");
-            if (tox->mdev->sync_role == MDEV_SYNC_ROLE_SECONDARY) {
+            if (tox->mdev->devices[dev_num].sync_role == MDEV_SYNC_ROLE_SECONDARY) {
                 sync_friend_commit(tox, dev_num);
                 if (tox->m->friend_list_change) {
                     tox->m->friend_list_change(tox, tox->m->friend_list_change_userdata);
@@ -814,7 +883,6 @@ static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, 
     return 0;
 }
 
-
 /******************************************************************************
  ******** Multi-device send data fxns                                  ********
  ******************************************************************************/
@@ -830,10 +898,9 @@ bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length)
         return 0;
     }
 
-    int i;
-
-    for (i = 0; i <= tox->mdev->devices_count; ++i) {
-        send_mdev_packet(tox, i, packet, length + 2);
+    uint32_t dev = UINT32_MAX;
+    while (get_next_device_online(tox->mdev, &dev)) {
+        send_mdev_packet(tox, dev, packet, length + 2);
     }
 
     return 1;
@@ -851,20 +918,42 @@ bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t len
         return 0;
     }
 
-    int i;
-
-    for (i = 0; i <= tox->mdev->devices_count; ++i) {
-        send_mdev_packet(tox, i, packet, length + 2);
+    uint32_t dev = UINT32_MAX;
+    while (get_next_device_online(tox->mdev, &dev)) {
+        send_mdev_packet(tox, dev, packet, length + 2);
     }
 
     return 1;
 }
 
 
-void mdev_send_message_generic(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYPE type, const uint8_t *message,
+int mdev_send_message_generic(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYPE type, const uint8_t *message,
                                size_t length)
 {
-    return;
+    if (length >= MAX_CRYPTO_DATA_SIZE - 2) {
+        return -2;
+    }
+
+    uint8_t packet[length + 2];
+    packet[0] = PACKET_ID_MDEV_SEND;
+    packet[1] = MDEV_SEND_MESSAGE + type;
+
+    uint8_t friend_num[sizeof(uint32_t)];
+    memcpy(friend_num, &friend_number, sizeof(uint32_t));
+    host_to_net(friend_num, sizeof(uint32_t));
+    memcpy(&packet[2], friend_num, sizeof(uint32_t));
+
+    if (length != 0) {
+        memcpy(packet + 2 + sizeof(uint32_t), message, length);
+    }
+
+    uint32_t dev = UINT32_MAX;
+    while(get_next_device_synced(tox->mdev, &dev)) {
+        int crypt_con_id = toxconn_crypt_connection_id(tox->tox_conn, tox->mdev->devices[dev].toxconn_id);
+        write_cryptpacket(tox->net_crypto, crypt_con_id, packet, length + 2, 0);
+    }
+
+    return 0;
 }
 
 
@@ -923,28 +1012,29 @@ void mdev_callback_self_status_message_change(Tox *tox,
     tox->mdev->self_status_message_change_userdata = userdata;
 }
 
+void mdev_callback_device_sent_message(Tox *tox, tox_device_sent_message_cb *callback, void *userdata)
+{
+    tox->mdev->device_sent_message = callback;
+    tox->mdev->device_sent_message_userdata = userdata;
+}
 
 /******************************************************************************
  ******** Multi-device init, exit fxns                                 ********
  ******************************************************************************/
 
 /* TODO replace the options here with our own! */
-MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error)
+MDevice *new_mdevice(Tox* tox, MDevice_Options *options, unsigned int *error)
 {
     MDevice *dev = calloc(1, sizeof(MDevice));
 
-    if (error) {
-        *error = MESSENGER_ERROR_OTHER;
-    }
+    SET_ERROR_PARAMETER(error, MESSENGER_ERROR_OTHER);
 
     if (!dev) {
         return NULL;
     }
 
-    if (error) {
-        *error = MESSENGER_ERROR_NONE;
-    }
-
+    dev->options = *options;
+    SET_ERROR_PARAMETER(error, MESSENGER_ERROR_NONE);
     return dev;
 }
 

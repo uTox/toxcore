@@ -889,8 +889,6 @@ void tox_self_get_secret_key(const Tox *tox, uint8_t *secret_key);
  * :: Internal device control (Tox address/id)
  *
  ******************************************************************************/
-
-
 typedef enum TOX_ERR_DEVICE_ADD {
 
     /**
@@ -935,7 +933,6 @@ typedef enum TOX_ERR_DEVICE_ADD {
     TOX_ERR_DEVICE_ADD_INTERNAL,
 
 } TOX_ERR_DEVICE_ADD;
-
 
 typedef enum TOX_ERR_DEVICE_GET {
 
@@ -1014,24 +1011,24 @@ typedef enum TOX_DEVICE_STATUS {
 } TOX_DEVICE_STATUS;
 
 /**
-* Add a device, if it adds you in return, you and it become associated
-* @param name User-friendly name of the device, may be NULL if length is 0
-* @param length Length of the name
-* @param address Public key part of the Tox ID of that device
-*/
+ * Add a device, if it adds you in return, you and it become associated
+ * @param name User-friendly name of the device, may be NULL if length is 0
+ * @param length Length of the name
+ * @param address Public key part of the Tox ID of that device
+ */
 bool tox_self_add_device(Tox *tox, const uint8_t* name, size_t length,
                          const uint8_t *address, TOX_ERR_DEVICE_ADD *error);
 
 /**
-* Returns the number of associated devices
-*/
+ * Returns the number of associated devices
+ */
 uint32_t tox_self_get_device_count(const Tox *tox);
 
 /**
-* Retreives the public-key, status and null-terminated name of an associated device
-* @param name A pointer to an array of MAX_NAME_LENGTH+1 bytes, optionally NULL
-* @param status Pointer to which the status will be written, optionally NULL
-*/
+ * Retreives the public-key, status and null-terminated name of an associated device
+ * @param name A pointer to an array of MAX_NAME_LENGTH+1 bytes, optionally NULL
+ * @param status Pointer to which the status will be written, optionally NULL
+ */
 bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t* name, TOX_DEVICE_STATUS *status,
                          uint8_t *public_key, TOX_ERR_DEVICE_GET *error);
 
@@ -1041,16 +1038,37 @@ bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t* name, TOX_DEVIC
 uint32_t tox_self_get_blacklisted_device_count(const Tox *tox);
 
 /**
-* Retreives the public-key of a permanently blacklisted device
-*/
+ * Retreives the public-key of a permanently blacklisted device
+ */
 bool tox_self_get_blacklisted_device(Tox *tox, uint32_t device_num, uint8_t *public_key,
                                      TOX_ERR_BLACKLISTED_DEVICE_GET *error);
 
 /**
-* Permanently removes and blacklists an associated device
-* Use this function if the device was lost or stolen
-*/
+ * Permanently removes and blacklists an associated device
+ * Use this function if the device was lost or stolen
+ */
 bool tox_self_delete_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_DEL *error);
+
+
+/**
+ * [tox_device_sent_message_cb description]
+ * @param tox            [description]
+ * @param sending_device [description]
+ * @param target_friend  [description]
+ * @param type           [description]
+ * @param msg            [description]
+ * @param msg_length     [description]
+ */
+typedef void tox_device_sent_message_cb(Tox *tox, uint32_t sending_device, uint32_t target_friend,
+                                        TOX_MESSAGE_TYPE type, uint8_t *msg, size_t msg_length);
+
+/**
+ * [tox_callback_device_sent_message description]
+ * @param tox      [description]
+ * @param callback [description]
+ * @param userdata [description]
+ */
+void tox_callback_device_sent_message(Tox *tox, tox_device_sent_message_cb *callback, void *userdata);
 
 
 /*******************************************************************************
@@ -1058,9 +1076,6 @@ bool tox_self_delete_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_DEL
  * :: User-visible client information (nickname/status)
  *
  ******************************************************************************/
-
-
-
 /**
  * Common error codes for all functions that set a piece of user-visible
  * client information.

@@ -141,17 +141,6 @@ typedef struct MDevice_Options {
 
 } MDevice_Options;
 
-typedef struct {
-    MDEV_STATUS status;
-    uint8_t     real_pk[crypto_box_PUBLICKEYBYTES];
-
-    int         toxconn_id;
-
-    uint64_t    last_seen_time;
-
-    uint8_t     name[MAX_NAME_LENGTH];
-    uint16_t    name_length;
-} Device;
 
 typedef struct Messenger Messenger;
 typedef struct MDevice MDevice;
@@ -224,6 +213,25 @@ typedef enum {
     MDEV_PUBKEY_STATUS_IN_SYNCLIST      = -6,
 } MDEV_PUBKEY_STATUS;
 
+typedef struct {
+    MDEV_STATUS status;
+
+    uint8_t     real_pk[crypto_box_PUBLICKEYBYTES];
+    int         toxconn_id;
+    uint64_t    last_seen_time;
+
+    uint8_t     name[MAX_NAME_LENGTH];
+    uint16_t    name_length;
+
+    /* Sync status */
+    MDEV_SYNC_ROLE      sync_role;
+    MDEV_SYNC_STATUS    sync_status;
+
+    Friend      *sync_friendlist;
+    uint32_t    sync_friendlist_capacity;
+    uint32_t    sync_friendlist_size;
+} Device;
+
 struct MDevice {
     Tox* tox;
 
@@ -233,21 +241,15 @@ struct MDevice {
     uint8_t         (*removed_devices)[crypto_box_PUBLICKEYBYTES];
     uint32_t        removed_devices_count;
 
-    /* Sync status */
-    MDEV_SYNC_ROLE      sync_role;
-    MDEV_SYNC_STATUS    sync_status;
-    uint32_t            sync_dev_num;
-
-    Friend      *sync_friendlist;
-    uint32_t    sync_friendlist_capacity;
-    uint32_t    sync_friendlist_size;
-
 
     /* Callbacks */
     void (*self_name_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
     void *self_name_change_userdata;
     void (*self_status_message_change)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
     void *self_status_message_change_userdata;
+
+    tox_device_sent_message_cb (*device_sent_message);
+    void *device_sent_message_userdata;
 
     MDevice_Options options;
 };
@@ -258,7 +260,7 @@ typedef struct Tox Tox;
 void do_multidevice(Tox *tox);
 
 /* TODO DOCUMENT THIS FXN */
-MDevice *new_mdevice(Tox* tox, Messenger_Options *options, unsigned int *error);
+MDevice *new_mdevice(Tox* tox, MDevice_Options *options, unsigned int *error);
 
 /* TODO DOCUMENT THIS FXN */
 int mdev_add_new_device_self(Tox *tox, const uint8_t* name, size_t length, const uint8_t *real_pk);
@@ -280,10 +282,22 @@ void mdev_callback_self_status_message_change(Tox *tox,
                                    void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *),
                                    void *userdata);
 
+/**
+ * Set the callback to recieve messages sent by other devices
+ *
+ * @param tox      [description]
+ * @param callback [description]
+ * @param userdata [description]
+ */
+void mdev_callback_device_sent_message(Tox *tox, tox_device_sent_message_cb *callback, void *userdata);
+
 /* Multi-device send data fxns */
 bool mdev_sync_name_change(Tox *tox, const uint8_t *name, size_t length);
 bool mdev_sync_status_message_change(Tox *tox, const uint8_t *status, size_t length);
-void mdev_send_message_generic(Tox* tox, uint32_t friend_number, TOX_MESSAGE_TYPE type,
+
+
+/* TODO DOCUMENT THIS FXN */
+int  mdev_send_message_generic(Tox* tox, uint32_t friend_number, TOX_MESSAGE_TYPE type,
                                const uint8_t *message, size_t length);
 
 /* Return size of the mdev data (for saving) */

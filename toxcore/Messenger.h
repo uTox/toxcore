@@ -100,18 +100,6 @@ enum {
     FRIEND_ONLINE,
 };
 
-typedef enum {
-    NO_FDEV,
-    /* Device is blocked */
-    FDEV_BLOCKED,
-    FDEV_REFUSED,
-    /* Device is active */
-    FDEV_OK,
-    FDEV_PENDING,
-    FDEV_CONFIRMED,
-    FDEV_ONLINE,
-} FDEV_STATUS;
-
 /* Errors for m_addfriend
  * FAERR - Friend Add Error
  */
@@ -196,7 +184,7 @@ enum {
 typedef struct Messenger Messenger;
 
 typedef struct {
-    FDEV_STATUS status; //0 no device, 1-3 device confimed, 4-5 device is blocked
+    uint8_t status; //0 no device, 1-3 device confimed, 4-5 device is blocked
     uint8_t     real_pk[crypto_box_PUBLICKEYBYTES];
 
     int         friendcon_id;
@@ -353,7 +341,6 @@ void getaddress(const Tox *tox, uint8_t *address);
  */
 int32_t m_addfriend(Tox *tox, const uint8_t *address, const uint8_t *data, uint16_t length);
 
-
 /* Add a friend without sending a friendrequest.
  *  return the friend number if success.
  *  return -3 if user's own key.
@@ -363,10 +350,8 @@ int32_t m_addfriend(Tox *tox, const uint8_t *address, const uint8_t *data, uint1
  */
 int32_t m_addfriend_norequest(Tox *tox, const uint8_t *real_pk);
 
-
 /* TODO document this FXN */
 int32_t m_add_device_to_friend(Tox *tox, const uint8_t *address, uint32_t friend_number);
-
 
 /*  return the friend number associated to that client id.
  *  return -1 if no such friend.
@@ -406,6 +391,8 @@ int m_delfriend(Tox *tox, int32_t friendnumber);
  *  return -1 on failure.
  */
 int m_get_friend_connectionstatus(const Tox *tox, int32_t friendnumber);
+
+int m_get_friend_connectionstatus_device(const Tox *tox, int32_t friendnumber, uint32_t dev_id);
 
 /* Checks if there exists a friend with given friendnumber.
  *

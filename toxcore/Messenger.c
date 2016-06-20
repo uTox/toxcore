@@ -53,6 +53,21 @@ static uint8_t friend_not_valid(const Messenger *m, int32_t friendnumber)
     return 1;
 }
 
+static uint8_t friend_dev_not_valid(const Messenger *m, uint32_t fr_id, uint32_t dev_id)
+{
+    if (fr_id < m->numfriends) {
+        if (m->friendlist[fr_id].status != 0) {
+            if (dev_id < m->friendlist[fr_id].dev_count) {
+                if (m->friendlist[fr_id].dev_list[dev_id].status) {
+                    return 0;
+                }
+            }
+        }
+    }
+
+    return 1;
+}
+
 /* Set the size of the friend list to numfriends.
  *
  *  return -1 if realloc fails.
@@ -251,7 +266,7 @@ static int32_t init_new_friend(Tox *tox, const uint8_t *real_pk, uint8_t status)
             m->friendlist[i].is_typing = 0;
             m->friendlist[i].message_id = 0;
 
-            m->friendlist[i].dev_list[0].status = FDEV_CONFIRMED;
+            m->friendlist[i].dev_list[0].status = FRIEND_CONFIRMED;
             m->friendlist[i].dev_list[0].friendcon_id = friendcon_id;
             id_copy(m->friendlist[i].dev_list[0].real_pk, real_pk);
             m->friendlist[i].dev_count = 1;
@@ -265,7 +280,7 @@ static int32_t init_new_friend(Tox *tox, const uint8_t *real_pk, uint8_t status)
             }
 
             if (toxconn_is_connected(tox->tox_conn, friendcon_id) == TOXCONN_STATUS_CONNECTED) {
-                m->friendlist[i].dev_list[0].status = FDEV_ONLINE;
+                m->friendlist[i].dev_list[0].status = FRIEND_ONLINE;
                 send_online_packet(tox, i, 0);
             }
 
@@ -296,7 +311,7 @@ static int32_t init_new_device_friend(Tox *tox, uint32_t friend_number, const ui
     if (tox->m->friendlist[friend_number].status >= FRIEND_CONFIRMED) {
         uint8_t i;
         for (i = 1; i <= dev_count; ++i) {
-            if (friend->dev_list[i].status == NO_FDEV) {
+            if (friend->dev_list[i].status == 0) {
                 friend->dev_list[i].friendcon_id = friendcon_id;
                 friend->dev_list[i].status = status;
                 id_copy(friend->dev_list[i].real_pk, real_pk);
@@ -306,7 +321,7 @@ static int32_t init_new_device_friend(Tox *tox, uint32_t friend_number, const ui
                                       tox, friend_number, i);
 
                 if (toxconn_is_connected(tox->tox_conn, friendcon_id) == TOXCONN_STATUS_CONNECTED) {
-                    friend->dev_list[i].status = FDEV_ONLINE;
+                    friend->dev_list[i].status = FRIEND_ONLINE;
                     friend->status = FRIEND_ONLINE;
                     send_online_packet(tox, friend_number, i);
                 }
@@ -449,7 +464,7 @@ int32_t m_add_device_to_friend(Tox *tox, const uint8_t *address, uint32_t friend
         return FAERR_SETNEWNOSPAM;
     }
 
-    int32_t ret = init_new_device_friend(tox, friend_number, real_pk, FDEV_PENDING);
+    int32_t ret = init_new_device_friend(tox, friend_number, real_pk, FRIEND_ADDED);
 
     return ret;
 }
@@ -482,7 +497,7 @@ static int32_t m_add_device_to_friend_confirmed(Tox *tox, const uint8_t *real_pk
         }
     }
 
-    return init_new_device_friend(tox, friend_number, real_pk, FDEV_CONFIRMED);
+    return init_new_device_friend(tox, friend_number, real_pk, FRIEND_CONFIRMED);
 }
 
 /* returns true if successful */
@@ -650,19 +665,41 @@ static int m_delete_device_from_friend(Tox *tox, const uint8_t *real_pk, uint32_
     return 0;
 }
 
-int m_get_friend_connectionstatus(const Tox *tox, int32_t friendnumber)
+int m_get_friend_connectionstatus(const Tox *tox, int32_t fr_id)
+{
+    if (friend_not_valid(tox->m, fr_id)) {
+        return -1;
+    }
+
+    int ret  = CONNECTION_NONE;
+    int best = CONNECTION_NONE;
+
+    uint32_t i;
+    for (i = 0; i < tox->m->friendlist[fr_id].dev_count; ++i) {
+        if (tox->m->friendlist[fr_id].dev_list[i].status == FRIEND_ONLINE) {
+            ret = m_get_friend_connectionstatus_device(tox, fr_id, i);
+            if (ret > best) {
+                best = ret;
+            }
+        }
+    }
+    return best;
+}
+
+int m_get_friend_connectionstatus_device(const Tox *tox, int32_t fr_id, uint32_t dev_id)
 {
     Messenger *m = tox->m;
 
-    if (friend_not_valid(tox->m, friendnumber))
+    if (friend_dev_not_valid(tox->m, fr_id, dev_id)) {
         return -1;
+    }
 
-    if (m->friendlist[friendnumber].status == FRIEND_ONLINE) {
+    if (m->friendlist[fr_id].dev_list[dev_id].status == FRIEND_ONLINE) {
         _Bool direct_connected = 0;
         unsigned int num_online_relays = 0;
         crypto_connection_status(tox->net_crypto,
                                  toxconn_crypt_connection_id(tox->tox_conn,
-                                                             m->friendlist[friendnumber].dev_list[0].friendcon_id),
+                                                             m->friendlist[fr_id].dev_list[dev_id].friendcon_id),
                                  &direct_connected,
                                  &num_online_relays);
 
@@ -729,7 +766,7 @@ int m_send_message_generic(Tox *tox, int32_t friendnumber, uint8_t type, const u
     int64_t packet_num = -1;
 
     for (dev = 0; dev < m->friendlist[friendnumber].dev_count; dev++) {
-        if (m->friendlist[friendnumber].dev_list[dev].status == FDEV_ONLINE) {
+        if (m->friendlist[friendnumber].dev_list[dev].status == FRIEND_ONLINE) {
             int crypt_con_id = toxconn_crypt_connection_id(tox->tox_conn,
                                                            m->friendlist[friendnumber].dev_list[dev].friendcon_id);
             int64_t this_packet_num = write_cryptpacket(tox->net_crypto, crypt_con_id, packet, length + 1, 0);
@@ -1131,7 +1168,7 @@ static void check_friend_tcp_udp(Tox *tox, int32_t friendnumber)
 }
 
 static void break_files(const Messenger *m, int32_t friendnumber);
-static void check_friend_connectionstatus(Tox *tox, int32_t friendnumber, uint8_t status)
+static void check_friend_connectionstatus(Tox *tox, int32_t friendnumber, uint32_t dev_id, uint8_t status)
 {
     if (status == NOFRIEND)
         return;
@@ -1164,30 +1201,37 @@ static void check_friend_connectionstatus(Tox *tox, int32_t friendnumber, uint8_
 
 void set_friend_status(Tox *tox, int32_t friendnumber, int32_t dev_id, uint8_t status)
 {
-    tox->m->friendlist[friendnumber].dev_list[dev_id].status = status;
-
     /* TODO
      *
      * we have to loop through the devices, see which ones are connected,
      * which are disconnected, and send the callbacks accordingly.
      */
 
-    check_friend_connectionstatus(tox, friendnumber, status);
-    tox->m->friendlist[friendnumber].status = status;
+    check_friend_connectionstatus(tox, friendnumber, dev_id, status);
+
     switch (status) {
         case FRIEND_ADDED:
         case FRIEND_REQUESTED: {
-            tox->m->friendlist[friendnumber].dev_list[0].status = FDEV_PENDING;
+            tox->m->friendlist[friendnumber].status = status;
+            tox->m->friendlist[friendnumber].dev_list[0].status = FRIEND_ADDED;
             break;
         }
 
         case FRIEND_CONFIRMED: {
-            tox->m->friendlist[friendnumber].dev_list[0].status = FDEV_CONFIRMED;
+            tox->m->friendlist[friendnumber].status = status;
+            int i;
+            for (i = 0; i < tox->m->friendlist[friendnumber].dev_count; ++i) {
+                if (tox->m->friendlist[friendnumber].dev_list[i].status == FRIEND_ONLINE) {
+                    tox->m->friendlist[friendnumber].status = FRIEND_ONLINE;
+                }
+            }
+            tox->m->friendlist[friendnumber].dev_list[dev_id].status = FRIEND_CONFIRMED;
             break;
         }
 
         case FRIEND_ONLINE: {
-            tox->m->friendlist[friendnumber].dev_list[0].status = FDEV_ONLINE;
+            tox->m->friendlist[friendnumber].status = FRIEND_ONLINE;
+            tox->m->friendlist[friendnumber].dev_list[dev_id].status = FRIEND_ONLINE;
             break;
         }
     }
@@ -2137,11 +2181,11 @@ static int handle_status(void *object, int friend_id, int device_id, uint8_t sta
     Tox *tox = object;
 
     if (status) { /* Went online. */
-        set_friend_status(tox, friend_id, device_id, FDEV_ONLINE);
+        set_friend_status(tox, friend_id, device_id, FRIEND_ONLINE);
         send_online_packet(tox, friend_id, device_id);
     } else { /* Went offline. */
         if (tox->m->friendlist[friend_id].status == FRIEND_ONLINE) {
-            set_friend_status(tox, friend_id, device_id, FDEV_CONFIRMED);
+            set_friend_status(tox, friend_id, device_id, FRIEND_CONFIRMED);
         }
     }
 
@@ -2173,7 +2217,7 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
             if (len != 1) {
                 return -1;
             }
-            set_friend_status(tox, friend_num, device_id, FDEV_ONLINE);
+            set_friend_status(tox, friend_num, device_id, FRIEND_ONLINE);
             send_online_packet(tox, friend_num, device_id);
             break;
         }
@@ -2181,7 +2225,7 @@ static int handle_packet(void *object, int friend_num, int device_id, uint8_t *t
             if (data_length != 0)
                 break;
 
-            set_friend_status(tox, friend_num, device_id, FDEV_CONFIRMED);
+            set_friend_status(tox, friend_num, device_id, FRIEND_CONFIRMED);
             break;
         }
 

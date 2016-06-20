@@ -335,15 +335,14 @@ static int init_sync(Tox *tox, uint32_t dev_num)
  *  successfully completes */
 static int decon_sync(MDevice *mdev, uint32_t dev_num)
 {
-    if (mdev->devices[dev_num].sync_status && mdev->devices[dev_num].sync_status != MDEV_SYNC_STATUS_DONE ) {
-        /* Clean up the sync state here! */
-        /* FIXME TODO */
+    if (mdev->devices[dev_num].status != MDEV_ONLINE) {
+        /* Handle this error state. */
+        mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_NONE;
     } else {
-        mdev->devices[dev_num].sync_status = MDEV_SYNC_STATUS_DONE;
+        mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_DONE;
     }
 
     mdev->devices[dev_num].sync_role     = MDEV_SYNC_ROLE_NONE;
-    mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_NONE;
 
     free(mdev->devices[dev_num].sync_friendlist);
     mdev->devices[dev_num].sync_friendlist           = NULL;
@@ -950,7 +949,7 @@ int mdev_send_message_generic(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYPE
     uint32_t dev = UINT32_MAX;
     while(get_next_device_synced(tox->mdev, &dev)) {
         int crypt_con_id = toxconn_crypt_connection_id(tox->tox_conn, tox->mdev->devices[dev].toxconn_id);
-        write_cryptpacket(tox->net_crypto, crypt_con_id, packet, length + 2, 0);
+        write_cryptpacket(tox->net_crypto, crypt_con_id, packet, length + 2 + sizeof(uint32_t), 0);
     }
 
     return 0;

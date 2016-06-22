@@ -38,8 +38,8 @@
 
 static void set_friend_status(Tox *tox, int32_t friendnumber, int32_t dev_id, uint8_t status);
 static void set_device_status(Messenger *m, int32_t friendnumber, int32_t device_id, uint8_t status);
-static int write_cryptpacket_id(const Tox *tox, int32_t friendnumber, uint8_t packet_id, const uint8_t *data,
-                                uint32_t length, uint8_t congestion_control);
+static int write_cryptpacket_id(const Tox *tox, int32_t friendnumber, uint32_t dev_num, uint8_t packet_id,
+                                const uint8_t *data, uint32_t length, uint8_t congestion_control);
 
 // friend_not_valid determines if the friendnumber passed is valid in the Messenger object
 static uint8_t friend_not_valid(const Messenger *m, int32_t friendnumber)
@@ -66,6 +66,22 @@ static uint8_t friend_dev_not_valid(const Messenger *m, uint32_t fr_id, uint32_t
     }
 
     return 1;
+}
+
+static bool friend_dev_next_online(const Friend *friend, uint32_t *device)
+{
+    if (!device) {
+        return 0;
+    }
+
+    uint32_t i;
+    for (i = (*device); ++i < friend->dev_count; ) {
+        if (friend->dev_list[i].status == FRIEND_ONLINE) {
+            *device = i;
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /* Set the size of the friend list to numfriends.
@@ -529,7 +545,14 @@ static bool send_user_devlist(Tox *tox, uint32_t friend_number)
         }
     }
 
-    return write_cryptpacket_id(tox, friend_number, PACKET_ID_MSGR_DEV_LIST, pkt, length, 0);
+    bool ret = 0;
+    uint32_t dev = UINT32_MAX;
+    while (friend_dev_next_online(&tox->m->friendlist[friend_number], &dev)) {
+        if (write_cryptpacket_id(tox, friend_number, dev, PACKET_ID_MSGR_DEV_LIST, pkt, length, 0) != -1) {
+            ret = 1;
+        }
+    }
+    return ret;
 }
 
 static int clear_receipts(Messenger *m, int32_t friendnumber)
@@ -765,20 +788,17 @@ int m_send_message_generic(Tox *tox, int32_t friendnumber, uint8_t type, const u
         memcpy(packet + 1, message, length);
     }
 
-    uint8_t dev;
+    uint32_t dev = UINT32_MAX;
     int64_t packet_num = -1;
 
-    for (dev = 0; dev < m->friendlist[friendnumber].dev_count; dev++) {
-        if (m->friendlist[friendnumber].dev_list[dev].status == FRIEND_ONLINE) {
-            int crypt_con_id = toxconn_crypt_connection_id(tox->tox_conn,
-                                                           m->friendlist[friendnumber].dev_list[dev].friendcon_id);
-            int64_t this_packet_num = write_cryptpacket(tox->net_crypto, crypt_con_id, packet, length + 1, 0);
+    while (friend_dev_next_online(&m->friendlist[friendnumber], &dev)) {
+        int crypt_con_id = toxconn_crypt_connection_id(tox->tox_conn, m->friendlist[friendnumber].dev_list[dev].friendcon_id);
+        int64_t this_packet_num = write_cryptpacket(tox->net_crypto, crypt_con_id, packet, length + 1, 0);
 
-            if (this_packet_num == -1 && packet_num != -1) {
-                continue;
-            } else {
-                packet_num = this_packet_num;
-            }
+        if (this_packet_num == -1 && packet_num != -1) {
+            continue;
+        } else {
+            packet_num = this_packet_num;
         }
     }
 
@@ -805,7 +825,14 @@ static int m_sendname(const Tox *tox, int32_t friendnumber, const uint8_t *name,
     if (length > MAX_NAME_LENGTH)
         return 0;
 
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_NICKNAME, name, length, 0);
+    bool ret = 0;
+    uint32_t dev = UINT32_MAX;
+    while (friend_dev_next_online(&tox->m->friendlist[friendnumber], &dev)) {
+        if (write_cryptpacket_id(tox, friendnumber, dev, PACKET_ID_NICKNAME, name, length, 0) != -1) {
+            ret = 1;
+        }
+    }
+    return ret;
 }
 
 /* Set the name and name_length of a friend.
@@ -1029,20 +1056,41 @@ int m_get_istyping(const Tox *tox, int32_t friendnumber)
     return tox->m->friendlist[friendnumber].is_typing;
 }
 
-static int send_statusmessage(const Tox *tox, int32_t friendnumber, const uint8_t *status, uint16_t length)
+static bool send_statusmessage(const Tox *tox, int32_t fr_num, const uint8_t *status, uint16_t length)
 {
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_STATUSMESSAGE, status, length, 0);
+    bool ret = 0;
+    uint32_t dev = UINT32_MAX;
+    while (friend_dev_next_online(&tox->m->friendlist[fr_num], &dev)) {
+        if (write_cryptpacket_id(tox, fr_num, dev, PACKET_ID_STATUSMESSAGE, status, length, 0) != -1) {
+            ret = 1;
+        }
+    }
+    return ret;
 }
 
-static int send_userstatus(const Tox *tox, int32_t friendnumber, uint8_t status)
+static bool send_userstatus(const Tox *tox, int32_t fr_num, uint8_t status)
 {
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_USERSTATUS, &status, sizeof(status), 0);
+    bool ret = 0;
+    uint32_t dev = UINT32_MAX;
+    while (friend_dev_next_online(&tox->m->friendlist[fr_num], &dev)) {
+        if (write_cryptpacket_id(tox, fr_num, dev, PACKET_ID_USERSTATUS, &status, sizeof(status), 0) != -1) {
+            ret = 1;
+        }
+    }
+    return ret;
 }
 
-static int send_user_istyping(const Tox *tox, int32_t friendnumber, uint8_t is_typing)
+static bool send_user_istyping(const Tox *tox, int32_t fr_num, uint8_t is_typing)
 {
     uint8_t typing = is_typing;
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_TYPING, &typing, sizeof(typing), 0);
+    bool ret = 0;
+    uint32_t dev = UINT32_MAX;
+    while (friend_dev_next_online(&tox->m->friendlist[fr_num], &dev)) {
+        if (write_cryptpacket_id(tox, fr_num, dev, PACKET_ID_TYPING, &typing, sizeof(typing), 0) != -1) {
+            ret = 1;
+        }
+    }
+    return ret;
 }
 
 int set_friend_statusmessage(const Messenger *m, int32_t friendnumber, const uint8_t *status, uint16_t length)
@@ -1240,13 +1288,13 @@ void set_friend_status(Tox *tox, int32_t friendnumber, int32_t dev_id, uint8_t s
     }
 }
 
-static int write_cryptpacket_id(const Tox *tox, int32_t friendnumber, uint8_t packet_id, const uint8_t *data,
-                                uint32_t length, uint8_t congestion_control)
+static int write_cryptpacket_id(const Tox *tox, int32_t fr_num, uint32_t dev_num, uint8_t packet_id,
+                                const uint8_t *data, uint32_t length, uint8_t congestion_control)
 {
-    if (friend_not_valid(tox->m, friendnumber))
+    if (friend_not_valid(tox->m, fr_num))
         return 0;
 
-    if (length >= MAX_CRYPTO_DATA_SIZE || tox->m->friendlist[friendnumber].status != FRIEND_ONLINE)
+    if (length >= MAX_CRYPTO_DATA_SIZE || tox->m->friendlist[fr_num].status != FRIEND_ONLINE)
         return 0;
 
     uint8_t packet[length + 1];
@@ -1255,8 +1303,9 @@ static int write_cryptpacket_id(const Tox *tox, int32_t friendnumber, uint8_t pa
     if (length != 0)
         memcpy(packet + 1, data, length);
 
-    return write_cryptpacket(tox->net_crypto, toxconn_crypt_connection_id(tox->tox_conn,
-                             tox->m->friendlist[friendnumber].dev_list[0].friendcon_id),
+    return write_cryptpacket(tox->net_crypto,
+                             toxconn_crypt_connection_id(tox->tox_conn,
+                                                         tox->m->friendlist[fr_num].dev_list[dev_num].friendcon_id),
                              packet, length + 1, congestion_control) != -1;
 }
 
@@ -1280,7 +1329,7 @@ void m_callback_group_invite(Tox *tox, void (*function)(Tox *tox, uint32_t, cons
  */
 int send_group_invite_packet(const Tox *tox, int32_t friendnumber, const uint8_t *data, uint16_t length)
 {
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_INVITE_GROUPCHAT, data, length, 0);
+    return write_cryptpacket_id(tox, friendnumber, 0, PACKET_ID_INVITE_GROUPCHAT, data, length, 0);
 }
 
 /****************FILE SENDING*****************/
@@ -1406,7 +1455,7 @@ static int file_sendrequest(const Tox *tox, int32_t friendnumber, uint8_t filenu
         memcpy(packet + 1 + sizeof(file_type) + sizeof(filesize) + FILE_ID_LENGTH, filename, filename_length);
     }
 
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_FILE_SENDREQUEST, packet, sizeof(packet), 0);
+    return write_cryptpacket_id(tox, friendnumber, 0, PACKET_ID_FILE_SENDREQUEST, packet, sizeof(packet), 0);
 }
 
 /* Send a file send request.
@@ -1470,7 +1519,7 @@ int send_file_control_packet(const Tox *tox, int32_t friendnumber, uint8_t send_
         memcpy(packet + 3, data, data_length);
     }
 
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_FILE_CONTROL, packet, sizeof(packet), 0);
+    return write_cryptpacket_id(tox, friendnumber, 0, PACKET_ID_FILE_CONTROL, packet, sizeof(packet), 0);
 }
 
 /* Send a file control request.
@@ -1960,7 +2009,7 @@ void m_callback_msi_packet(Tox *tox, void (*function)(Tox *tox, uint32_t, const 
  */
 int m_msi_packet(const Tox *tox, int32_t friendnumber, const uint8_t *data, uint16_t length)
 {
-    return write_cryptpacket_id(tox, friendnumber, PACKET_ID_MSI, data, length, 0);
+    return write_cryptpacket_id(tox, friendnumber, 0, PACKET_ID_MSI, data, length, 0);
 }
 
 static int handle_custom_lossy_packet(void *object, int friend_num, int device_id, const uint8_t *packet, uint16_t length)

@@ -853,8 +853,8 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             break;
         }
 
-        case MDEV_SYNC_DEVICE: {
-            printf("%d\n", pkt[0]);
+        case MDEV_SYNC_DEVICE_COUNT: {
+            printf("%d", pkt[1]);
             break;
         }
 

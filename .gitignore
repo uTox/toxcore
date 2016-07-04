@@ -75,3 +75,9 @@ cscope.files
 
 # rpm
 tox.spec
+
+# Emacs
+.dir-locals.el
+GPATH
+GRTAGS
+GTAGS

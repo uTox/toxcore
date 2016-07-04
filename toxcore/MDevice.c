@@ -858,6 +858,16 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             break;
         }
 
+        case MDEV_SEND_STATUS: {
+            printf("recv: %u\n", pkt[1]);
+            break;
+        }
+
+        case MDEV_SEND_NAME: {
+            printf("recv: %u\n", pkt[1]);
+            break;
+        }
+
     }
 
     return 0;

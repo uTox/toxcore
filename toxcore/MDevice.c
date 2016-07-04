@@ -306,7 +306,13 @@ static bool sync_allowed(Tox *tox, MDEV_INTERN_SYNC_ERR *error)
 /** starts the sync process, be sending the other device our uptime.
  *
  * The device with the longest uptime will be the host (sending data first),
- * with the younger device sending data following */
+ * with the younger device sending data following
+ *
+ * The sync order should follow the MDEV_PACKET_TYPE enum in MDevice.h
+ * First the Basic user status/state from Messenger.
+ * Followed by syncing the friend list.
+ * Finally syncing the device network.
+ */
 static int init_sync(Tox *tox, uint32_t dev_num)
 {
     if (!sync_allowed(tox, NULL)) {

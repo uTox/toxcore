@@ -369,7 +369,31 @@ static int init_sync_friends(Tox *tox, uint32_t dev_num)
 
     packet[0] = PACKET_ID_MDEV_SYNC;
     packet[1] = MDEV_SYNC_CONTACT_COUNT;
-    packet[2] = (m->numfriends);
+
+    uint8_t numfriends[sizeof(m->numfriends)];
+    memcpy(numfriends, &(m->numfriends), sizeof(uint32_t));
+    host_to_net(numfriends, sizeof(uint32_t));
+    memcpy(&packet[2], numfriends, sizeof(uint32_t));
+
+    return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+}
+
+static int init_sync_devices(Tox *tox, uint32_t dev_num)
+{
+    if (!sync_allowed(tox, NULL)) {
+        return -1;
+    }
+    MDevice *mdev = tox->mdev;
+
+    uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(mdev->devices_count)];
+
+    packet[0] = PACKET_ID_MDEV_SYNC;
+    packet[1] = MDEV_SYNC_DEVICE_COUNT;
+
+    uint8_t device_count[sizeof(mdev->devices_count)];
+    memcpy(device_count, &(mdev->devices_count), sizeof(uint32_t));
+    host_to_net(device_count, sizeof(uint32_t));
+    memcpy(&packet[2], device_count, sizeof(uint32_t));
 
     return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
 }
@@ -844,6 +868,21 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
                     tox->m->friend_list_change(tox, tox->m->friend_list_change_userdata);
                 }
             }
+            break;
+        }
+
+        case MDEV_SYNC_DEVICE_COUNT: {
+            printf("%d", pkt[1]);
+            break;
+        }
+
+        case MDEV_SEND_STATUS: {
+            printf("recv: %u\n", pkt[1]);
+            break;
+        }
+
+        case MDEV_SEND_NAME: {
+            printf("recv: %u\n", pkt[1]);
             break;
         }
 

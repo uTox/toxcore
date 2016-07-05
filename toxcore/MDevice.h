@@ -92,8 +92,8 @@ typedef enum {
 
     MDEV_SYNC_SELF,
     MDEV_SYNC_SELF_NAME,
-    MDEV_SYNC_SELF_MSG,
-    MDEV_SYNC_SELF_STATUS,
+    MDEV_SYNC_SELF_STATUS_MSG,
+    MDEV_SYNC_SELF_STATE,
     MDEV_SYNC_SELF_DONE,
 
     MDEV_SYNC_CONTACT_START,
@@ -119,9 +119,10 @@ typedef enum {
     MDEV_SYNC_NOTHING,
 
     /* Send type packets are for active changes */
-    MDEV_SEND_NAME,
-    MDEV_SEND_STATUS_MSG, /* User flavor text */
-    MDEV_SEND_STATE,      /* User state (e.g. Available, Away, DND */
+    MDEV_SEND_SELF_NAME,
+    MDEV_SEND_SELF_STATUS_MSG, /* User flavor text */
+    MDEV_SEND_SELF_STATE,      /* User state (e.g. Available, Away, DND */
+
     MDEV_SEND_MESSAGE,
     MDEV_SEND_MESSAGE_ACTION,
 

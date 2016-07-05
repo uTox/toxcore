@@ -629,7 +629,7 @@ static int handle_packet_send(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
     MDevice *mdev = tox->mdev;
 
     switch (pkt[0]) {
-        case MDEV_SEND_NAME: {
+        case MDEV_SEND_SELF_NAME: {
             uint8_t *name        = pkt + 1;
             size_t   name_length = length - 1;
 
@@ -658,7 +658,7 @@ static int handle_packet_send(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             break;
         }
 
-        case MDEV_SEND_STATUS_MSG: {
+        case MDEV_SEND_SELF_STATUS_MSG: {
             uint8_t *status        = pkt + 1;
             size_t   status_length = length - 1;
 
@@ -684,7 +684,7 @@ static int handle_packet_send(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             break;
         }
 
-        case MDEV_SEND_STATE: {
+        case MDEV_SEND_SELF_STATE: {
             if (length != 2) {
                 return -1;
             }
@@ -774,6 +774,26 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
                 init_sync_friends(tox, dev_num);
             }
 
+            break;
+        }
+
+        case MDEV_SYNC_SELF_NAME: {
+            printf("recv: %u\n", pkt[1]);
+            break;
+        }
+
+        case MDEV_SYNC_SELF_STATUS_MSG: {
+            printf("recv: %u\n", pkt[1]);
+            break;
+        }
+
+        case MDEV_SYNC_SELF_STATE: {
+            printf("recv: %u\n", pkt[1]);
+            break;
+        }
+
+        case MDEV_SYNC_SELF_DONE: {
+            printf("recv: %u\n", pkt[1]);
             break;
         }
 
@@ -875,17 +895,6 @@ static int handle_packet_sync(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
             printf("%d", pkt[1]);
             break;
         }
-
-        case MDEV_SEND_STATUS: {
-            printf("recv: %u\n", pkt[1]);
-            break;
-        }
-
-        case MDEV_SEND_NAME: {
-            printf("recv: %u\n", pkt[1]);
-            break;
-        }
-
     }
 
     return 0;
@@ -953,7 +962,7 @@ bool mdev_send_name_change(Tox *tox, const uint8_t *name, size_t length)
     uint8_t packet[length + 2];
 
     packet[0] = PACKET_ID_MDEV_SEND;
-    packet[1] = MDEV_SEND_NAME;
+    packet[1] = MDEV_SEND_SELF_NAME;
     memcpy(&packet[2], name, length);
 
     if (tox->mdev->devices_count == 0) {
@@ -973,7 +982,7 @@ bool mdev_send_status_message_change(Tox *tox, const uint8_t *status, size_t len
     uint8_t packet[length + 2];
 
     packet[0] = PACKET_ID_MDEV_SEND;
-    packet[1] = MDEV_SEND_STATUS_MSG;
+    packet[1] = MDEV_SEND_SELF_STATUS_MSG;
     memcpy(&packet[2], status, length);
 
     if (tox->mdev->devices_count == 0) {
@@ -997,7 +1006,7 @@ bool mdev_send_state_change(Tox *tox, const TOX_USER_STATUS state)
     uint8_t packet[3];
 
     packet[0] = PACKET_ID_MDEV_SEND;
-    packet[1] = MDEV_SEND_STATE;
+    packet[1] = MDEV_SEND_SELF_STATE;
     packet[2] = state;
 
     uint32_t dev = UINT32_MAX;

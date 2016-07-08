@@ -151,7 +151,8 @@ static bool get_next_device_synced(const MDevice *mdev, uint32_t *device)
     return 0;
 }
 
-static int send_mdev_packet(Tox *tox, int32_t dev_num, uint8_t *packet, size_t length)
+/* Returns 1 on success, and 0 on failure. */
+static bool send_mdev_packet(Tox *tox, int32_t dev_num, uint8_t *packet, size_t length)
 {
     MDevice *mdev = tox->mdev;
 
@@ -160,7 +161,8 @@ static int send_mdev_packet(Tox *tox, int32_t dev_num, uint8_t *packet, size_t l
                              packet, length, 0) != -1;
 }
 
-static int send_mdev_sync_packet(Tox *tox, int32_t dev_num, uint8_t pkt)
+/* Returns 1 on success, and 0 on failure. */
+static bool send_mdev_sync_packet(Tox *tox, int32_t dev_num, uint8_t pkt)
 {
     uint8_t packet[ (sizeof(uint8_t) * 2)];
 

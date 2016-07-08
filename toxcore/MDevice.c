@@ -656,6 +656,8 @@ static int handle_packet_send(Tox *tox, uint32_t dev_num, uint8_t *pkt, uint16_t
 
             tox->m->name_length = name_length;
 
+            /* TODO don't send callback if the name is the same */
+
             if (mdev->self_name_change) {
                 mdev->self_name_change(tox, dev_num, name, name_length, mdev->self_name_change_userdata);
             }

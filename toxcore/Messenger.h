@@ -267,7 +267,7 @@ struct Messenger {
     void (*friend_message)(struct Tox *tox, uint32_t, unsigned int, const uint8_t *, size_t, void *);
     void *friend_message_userdata;
 
-    tox_friend_list_change_cb (*friend_list_change);
+    tox_friend_list_change_cb (*friend_list_change); /* TODO, does this fit better here? or in MDevice.c? */
     void *friend_list_change_userdata;
 
     void (*friend_namechange)(struct Tox *tox, uint32_t, const uint8_t *, size_t, void *);

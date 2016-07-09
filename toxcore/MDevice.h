@@ -118,10 +118,21 @@ typedef enum {
 
     MDEV_SYNC_NOTHING,
 
+
     /* Send type packets are for active changes that were just made by a client. */
+
+
     MDEV_SEND_SELF_NAME,
     MDEV_SEND_SELF_STATUS_MSG, /* User flavor text */
     MDEV_SEND_SELF_STATE,      /* User state (e.g. Available, Away, DND */
+
+    MDEV_SEND_CONTACT_ADDED,    /* TODO */
+    MDEV_SEND_CONTACT_ACCEPTED, /* TODO */
+    MDEV_SEND_CONTACT_REMOVED,  /* TODO */
+
+    MDEV_SEND_DEVICE_ADDED,     /* TODO */
+    MDEV_SEND_DEVICE_ACCEPTED,  /* TODO */
+    MDEV_SEND_DEVICE_REMOVED,   /* TODO */
 
     MDEV_SEND_MESSAGE,
     MDEV_SEND_MESSAGE_ACTION,
@@ -246,10 +257,8 @@ struct MDevice {
     /* Callbacks */
     tox_mdev_self_name_cb (*self_name_change);
     void *self_name_change_userdata;
-
     tox_mdev_self_status_message_cb (*self_status_message_change);
     void *self_status_message_change_userdata;
-
     tox_mdev_self_state_cb (*self_user_state_change);
     void *self_user_state_change_userdata;
 
@@ -261,27 +270,82 @@ struct MDevice {
 
 typedef struct Tox Tox;
 
-/* TODO DOCUMENT THIS FXN */
+/**
+ * [do_multidevice description]
+ * @param tox [description]
+ */
 void do_multidevice(Tox *tox);
 
-/* TODO DOCUMENT THIS FXN */
+/**
+ * [new_mdevice description]
+ * @param  tox     [description]
+ * @param  options [description]
+ * @param  error   [description]
+ * @return         [description]
+ */
 MDevice *new_mdevice(Tox* tox, MDevice_Options *options, unsigned int *error);
 
-/* TODO DOCUMENT THIS FXN */
+/**
+ * [mdev_add_new_device_self description]
+ * @param  tox     [description]
+ * @param  name    [description]
+ * @param  length  [description]
+ * @param  real_pk [description]
+ * @return         [description]
+ */
 int mdev_add_new_device_self(Tox *tox, const uint8_t* name, size_t length, const uint8_t *real_pk);
 
+
 /* Removes a device and adds it to the removed_devices blacklist */
+/**
+ * [mdev_remove_device description]
+ * @param  tox     [description]
+ * @param  address [description]
+ * @return         [description]
+ */
 int mdev_remove_device(Tox* tox, const uint8_t *address);
 
 /** returns the count of active devices in the device list. */
+/**
+ * [mdev_get_dev_count description]
+ * @param  tox [description]
+ * @return     [description]
+ */
 int32_t mdev_get_dev_count(Tox *tox);
 
 /** returns true on success, if devices exists, pk is set the the real_pk at that device index */
+/**
+ * [mdev_get_dev_pubkey description]
+ * @param  tox    [description]
+ * @param  number [description]
+ * @param  pk     [description]
+ * @return        [description]
+ */
 bool mdev_get_dev_pubkey(Tox *tox, uint32_t number, uint8_t pk[crypto_box_PUBLICKEYBYTES]);
 
 /* Multi-device set callbacks */
+/**
+ * [mdev_callback_self_name description]
+ * @param tox      [description]
+ * @param function [description]
+ * @param userdata [description]
+ */
 void mdev_callback_self_name(Tox *tox, tox_mdev_self_name_cb *function, void *userdata);
+
+/**
+ * [mdev_callback_self_status_message description]
+ * @param tox      [description]
+ * @param function [description]
+ * @param userdata [description]
+ */
 void mdev_callback_self_status_message(Tox *tox, tox_mdev_self_status_message_cb *function, void *userdata);
+
+/**
+ * [mdev_callback_self_state description]
+ * @param tox      [description]
+ * @param function [description]
+ * @param userdata [description]
+ */
 void mdev_callback_self_state(Tox *tox, tox_mdev_self_state_cb *function, void *userdata);
 
 /**
@@ -293,19 +357,62 @@ void mdev_callback_self_state(Tox *tox, tox_mdev_self_state_cb *function, void *
  */
 void mdev_callback_device_sent_message(Tox *tox, tox_mdev_sent_message_cb *callback, void *userdata);
 
+/** TODO
+ * [mdev_callback_mdev_sent_message description]
+ *
+ * @param tox      [description]
+ * @param fxn      [description]
+ * @param userdata [description]
+ */
+void mdev_callback_mdev_sent_message(Tox *tox, tox_mdev_sent_message_cb *fxn, void *userdata);
+
+
 /* Multi-device send data fxns */
 bool mdev_send_name_change(Tox *tox, const uint8_t *name, size_t length);
+
+/** TODO
+ * [mdev_send_status_message_change description]
+ * @param  tox    [description]
+ * @param  status [description]
+ * @param  length [description]
+ * @return        [description]
+ */
 bool mdev_send_status_message_change(Tox *tox, const uint8_t *status, size_t length);
 
+/** TODO
+ * [mdev_send_state_change description]
+ * @param  tox   [description]
+ * @param  state [description]
+ * @return       [description]
+ */
+bool mdev_send_state_change(Tox *tox, const TOX_USER_STATUS state);
 
-/* TODO DOCUMENT THIS FXN */
+
+/** TODO
+ * [mdev_send_message_generic description]
+ * @param  tox           [description]
+ * @param  friend_number [description]
+ * @param  type          [description]
+ * @param  message       [description]
+ * @param  length        [description]
+ * @return               [description]
+ */
 int  mdev_send_message_generic(Tox* tox, uint32_t friend_number, TOX_MESSAGE_TYPE type,
                                const uint8_t *message, size_t length);
 
-/* Return size of the mdev data (for saving) */
+/** TODO
+ * [mdev_size description]
+ * @param  tox [description]
+ * @return     [description]
+ */
 size_t mdev_size(const Tox *tox);
 
-/* Save the mdev in data of size mdev_size(). */
+/** TODO
+ * [mdev_save description]
+ * @param  tox  [description]
+ * @param  data [description]
+ * @return      [description]
+ */
 uint8_t *mdev_save(const Tox *tox, uint8_t *data);
 
 /* Loads the MDevice data from the sections of the saved state */

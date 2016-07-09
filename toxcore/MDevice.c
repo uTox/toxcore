@@ -1168,8 +1168,6 @@ void kill_multidevice(MDevice *dev)
     free(dev);
 }
 
-
-
 void do_multidevice(Tox *tox)
 {
     if (!tox || !tox->mdev) {

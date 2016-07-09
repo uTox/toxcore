@@ -305,65 +305,12 @@ static bool sync_allowed(Tox *tox, MDEV_INTERN_SYNC_ERR *error)
     return 1;
 }
 
-/** starts the sync process, be sending the other device our uptime.
- *
- * The device with the longest uptime will be the host (sending data first),
- * with the younger device sending data following
- *
- * The sync order should follow the MDEV_PACKET_TYPE enum in MDevice.h
- * First the Basic user status/state from Messenger.
- * Followed by syncing the friend list.
- * Finally syncing the device network.
- */
-static int init_sync(Tox *tox, uint32_t dev_num)
+static bool init_sync_meta(Tox *tox, uint32_t dev_num)
 {
-    if (!sync_allowed(tox, NULL)) {
-        return -1;
-    }
-
-    tox->mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_ACTIVE;
-
-    uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(tox->uptime) ];
-
-    packet[0] = PACKET_ID_MDEV_SYNC;
-    packet[1] = MDEV_SYNC_META_UPTIME;
-
-    unix_time_update();
-    uint64_t our_uptime = (unix_time() - tox->uptime);
-
-    uint8_t uptime[sizeof(uint64_t)];
-    memcpy(uptime, &our_uptime, sizeof(uint64_t));
-    host_to_net(uptime, sizeof(uint64_t));
-    memcpy(&packet[2], uptime, sizeof(uint64_t));
-
-    return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+    return -1;
 }
 
-/** cleans up the sync process if the peer goes offline before the sync
- *  successfully completes *
- *
- *  TODO this needs to be tested!
- */
-static int decon_sync(MDevice *mdev, uint32_t dev_num)
-{
-    if (mdev->devices[dev_num].status != MDEV_ONLINE) {
-        /* Handle this error state. */
-        mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_NONE;
-    } else {
-        mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_DONE;
-    }
-
-    mdev->devices[dev_num].sync_role     = MDEV_SYNC_ROLE_NONE;
-
-    free(mdev->devices[dev_num].sync_friendlist);
-    mdev->devices[dev_num].sync_friendlist           = NULL;
-    mdev->devices[dev_num].sync_friendlist_size      = 0;
-    mdev->devices[dev_num].sync_friendlist_capacity  = 0;
-
-    return 0;
-}
-
-static int init_sync_friends(Tox *tox, uint32_t dev_num)
+static bool init_sync_friends(Tox *tox, uint32_t dev_num)
 {
     if (!sync_allowed(tox, NULL)) {
         return -1;
@@ -383,7 +330,7 @@ static int init_sync_friends(Tox *tox, uint32_t dev_num)
     return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
 }
 
-static int init_sync_devices(Tox *tox, uint32_t dev_num)
+static bool init_sync_devices(Tox *tox, uint32_t dev_num)
 {
     if (!sync_allowed(tox, NULL)) {
         return -1;
@@ -401,6 +348,104 @@ static int init_sync_devices(Tox *tox, uint32_t dev_num)
     memcpy(&packet[2], device_count, sizeof(uint32_t));
 
     return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+}
+
+/** starts the sync process, be sending the other device our uptime.
+ *
+ * The device with the longest uptime will be the host (sending data first),
+ * with the younger device sending data following
+ *
+ * The sync order should follow the MDEV_PACKET_TYPE enum in MDevice.h
+ * First the Basic user status/state from Messenger.
+ * Followed by syncing the friend list.
+ * Finally syncing the device network.
+ */
+static int init_sync(Tox *tox, uint32_t dev_num)
+{
+    if (!sync_allowed(tox, NULL)) {
+        return -1;
+    }
+
+    tox->mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_PENDING;
+
+    uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(tox->uptime) ];
+
+    packet[0] = PACKET_ID_MDEV_SYNC;
+    packet[1] = MDEV_SYNC_META_UPTIME;
+
+    unix_time_update();
+    uint64_t our_uptime = (unix_time() - tox->uptime);
+
+    uint8_t uptime[sizeof(uint64_t)];
+    memcpy(uptime, &our_uptime, sizeof(uint64_t));
+    host_to_net(uptime, sizeof(uint64_t));
+    memcpy(&packet[2], uptime, sizeof(uint64_t));
+
+    return send_mdev_packet(tox, dev_num, packet, sizeof(packet));
+}
+
+static int decon_sync_meta(Device *dev)
+{
+    return -1;
+}
+
+static int decon_sync_friends(Device *dev)
+{
+    if (dev->sync_friendlist) {
+        free(dev->sync_friendlist);
+        dev->sync_friendlist = NULL;
+    }
+
+    dev->sync_friendlist_size      = 0;
+    dev->sync_friendlist_capacity  = 0;
+    return 0;
+}
+
+static int decon_sync_devices(Device *dev)
+{
+    return -1;
+}
+
+/** cleans up the sync process if the peer goes offline before the sync
+ *  successfully completes *
+ *
+ *  TODO this needs to be tested!
+ */
+static int decon_sync(MDevice *mdev, uint32_t dev_num)
+{
+    if (mdev->devices[dev_num].status != MDEV_ONLINE) {
+        switch (mdev->devices[dev_num].sync_status) {
+            case MDEV_SYNC_STATUS_META_SENDING:
+            case MDEV_SYNC_STATUS_META_RECIVING: {
+                /* TODO */
+                break;
+            }
+
+            case MDEV_SYNC_STATUS_FRIENDS_SENDING:
+            case MDEV_SYNC_STATUS_FRIENDS_RECIVING: {
+                decon_sync_friends(&mdev->devices[dev_num]);
+                break;
+            }
+
+            case MDEV_SYNC_STATUS_DEVICES_SENDING:
+            case MDEV_SYNC_STATUS_DEVICES_RECIVING: {
+                /* TODO */
+                break;
+            }
+
+            case MDEV_SYNC_STATUS_NONE:
+            case MDEV_SYNC_STATUS_PENDING:
+            case MDEV_SYNC_STATUS_DONE: {
+                /* TODO in this case, everything should be in a safe state. */
+            }
+        }
+        mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_NONE;
+    } else {
+        mdev->devices[dev_num].sync_status   = MDEV_SYNC_STATUS_DONE;
+    }
+
+    mdev->devices[dev_num].sync_role     = MDEV_SYNC_ROLE_NONE;
+    return 0;
 }
 
 static int request_friend_sync(Tox *tox, uint32_t dev_num)

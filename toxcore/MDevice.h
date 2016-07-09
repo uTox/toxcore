@@ -114,6 +114,8 @@ typedef enum {
     MDEV_SYNC_DEVICE_DONE,
     MDEV_SYNC_DEVICE_ERROR,
 
+    MDEV_SYNC_COMMIT,
+
     MDEV_SYNC_MESSAGES,         /* TODO help */
 
     MDEV_SYNC_NOTHING,
@@ -177,8 +179,8 @@ typedef enum {
 
 typedef enum {
     MDEV_SYNC_STATUS_NONE,
-    MDEV_SYNC_STATUS_ACTIVE,
 
+    MDEV_SYNC_STATUS_PENDING,
 
     MDEV_SYNC_STATUS_META_SENDING,
     MDEV_SYNC_STATUS_META_RECIVING,
@@ -188,7 +190,6 @@ typedef enum {
 
     MDEV_SYNC_STATUS_DEVICES_SENDING,
     MDEV_SYNC_STATUS_DEVICES_RECIVING,
-
 
     MDEV_SYNC_STATUS_DONE,
 } MDEV_SYNC_STATUS;
@@ -201,8 +202,8 @@ typedef enum {
     MDEV_SYNC_ERR_REFUSED,
     MDEV_SYNC_ERR_UNSUPPORTED,
 
-    MDEV_SYNC_ERR_UNEXPECTED, /* Used if one device tries to sync out of order */
-    MDEV_SYNC_ERR_VERSION_INCOPAT, /* MDevice version mismatch; can not sync */
+    MDEV_SYNC_ERR_UNEXPECTED,       /* Used if one device tries to sync out of order */
+    MDEV_SYNC_ERR_VERSION_INCOMPAT, /* MDevice version mismatch; can not sync */
     MDEV_SYNC_ERR_UNKNOWN,
 
 } MDEV_SYNC_ERR;

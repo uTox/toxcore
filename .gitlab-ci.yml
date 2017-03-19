@@ -52,6 +52,7 @@ linux_cmake:
 
 test:linux_autotools:
   stage: test
+  when: manual
   tags:
     - alpine-tox
   cache:
@@ -74,28 +75,44 @@ test:linux_autotools:
   dependencies:
     - linux_cmake
 
+test:version:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R version
+
 test:crypto:
   <<: *cmake_test
   script:
     - cd cmake_build
     - ctest -R crypto
-test:DHT:
-  <<: *cmake_test
-  script:
-    - cd cmake_build
-    - ctest -R dht
+
 test:network:
   <<: *cmake_test
   script:
     - cd cmake_build
     - ctest -R network
-test:tox:
+
+test:DHT:
   <<: *cmake_test
   script:
     - cd cmake_build
-    - ctest -R tox
+    - ctest -R dht
+
 test:messenger:
   <<: *cmake_test
   script:
     - cd cmake_build
     - ctest -R messenger
+
+test:tox:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R "tox$"
+
+test:tox_one:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R "tox_one$"

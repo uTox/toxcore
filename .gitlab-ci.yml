@@ -50,7 +50,7 @@ linux_cmake:
     expire_in: 15m
     untracked: true
 
-test_autotools:
+test:linux_autotools:
   stage: test
   tags:
     - alpine-tox
@@ -63,7 +63,7 @@ test_autotools:
   script:
     - make check
 
-test_cmake:
+.cmake_test: &cmake_test
   stage: test
   tags:
     - alpine-tox
@@ -73,5 +73,29 @@ test_cmake:
       - cache/
   dependencies:
     - linux_cmake
+
+test:crypto:
+  <<: *cmake_test
   script:
-    - make -C cmake_build test
+    - cd cmake_build
+    - ctest -R crypto
+test:DHT:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R dht
+test:network:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R network
+test:tox:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R tox
+test:messenger:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R messenger

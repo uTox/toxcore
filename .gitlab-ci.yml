@@ -6,7 +6,7 @@ stages:
 #
 # build
 #
-linux:
+linux_autotools:
   stage: build
   tags:
     -  alpine-tox
@@ -18,7 +18,6 @@ linux:
   variables:
     GL_BUILD: "lin64"
   before_script:
-    - ls
     - autoreconf -i
     - ./configure
   script:
@@ -29,7 +28,29 @@ linux:
     expire_in: 15m
     untracked: true
 
-test_one:
+linux_cmake:
+  stage: build
+  tags:
+    -  alpine-tox
+  cache:
+    # keep cache across stages
+    key: "$CI_BUILD_REF_NAME/linux"
+    paths:
+      - cache/
+  variables:
+    GL_BUILD: "lin64"
+  before_script:
+    - mkdir -p cmake_build
+    - cmake -H. -Bcmake_build -DCMAKE_COLOR_MAKEFILE=ON
+  script:
+    - make -C cmake_build
+  artifacts:
+    # keep compiled files as artifacts to pass to the test stage
+    # remove them after one hour
+    expire_in: 15m
+    untracked: true
+
+test_autotools:
   stage: test
   tags:
     - alpine-tox
@@ -38,6 +59,19 @@ test_one:
     paths:
       - cache/
   dependencies:
-    - linux
+    - linux_autotools
   script:
     - make check
+
+test_cmake:
+  stage: test
+  tags:
+    - alpine-tox
+  cache:
+    key: "$CI_BUILD_REF_NAME/linux"
+    paths:
+      - cache/
+  dependencies:
+    - linux_cmake
+  script:
+    - make -C cmake_build test

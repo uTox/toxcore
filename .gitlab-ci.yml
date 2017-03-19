@@ -1,0 +1,43 @@
+image: alpine-tox
+
+stages:
+  - build
+  - test
+#
+# build
+#
+linux:
+  stage: build
+  tags:
+    -  alpine-tox
+  cache:
+    # keep cache across stages
+    key: "$CI_BUILD_REF_NAME/linux"
+    paths:
+      - cache/
+  variables:
+    GL_BUILD: "lin64"
+  before_script:
+    - ls
+    - autoreconf -i
+    - ./configure
+  script:
+    - make
+  artifacts:
+    # keep compiled files as artifacts to pass to the test stage
+    # remove them after one hour
+    expire_in: 15m
+    untracked: true
+
+test_one:
+  stage: test
+  tags:
+    - alpine-tox
+  cache:
+    key: "$CI_BUILD_REF_NAME/linux"
+    paths:
+      - cache/
+  dependencies:
+    - linux
+  script:
+    - make check

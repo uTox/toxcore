@@ -31,6 +31,48 @@ static void do_onion(Onion *onion)
     do_DHT(onion->dht);
 }
 
+// Moved from onion_announce.c
+/* Create and send an onion announce request packet.
+ *
+ * path is the path the request will take before it is sent to dest.
+ *
+ * public_key and secret_key is the kepair which will be used to encrypt the request.
+ * ping_id is the ping id that will be sent in the request.
+ * client_id is the client id of the node we are searching for.
+ * data_public_key is the public key we want others to encrypt their data packets with.
+ * sendback_data is the data of ONION_ANNOUNCE_SENDBACK_DATA_LENGTH length that we expect to
+ * receive back in the response.
+ *
+ * return -1 on failure.
+ * return 0 on success.
+ */
+int send_announce_request(Networking_Core *net, const Onion_Path *path, Node_format dest, const uint8_t *public_key,
+                          const uint8_t *secret_key, const uint8_t *ping_id, const uint8_t *client_id, const uint8_t *data_public_key,
+                          uint64_t sendback_data)
+{
+    uint8_t request[ONION_ANNOUNCE_REQUEST_SIZE];
+    int len = create_announce_request(request, sizeof(request), dest.public_key, public_key, secret_key, ping_id, client_id,
+                                      data_public_key, sendback_data);
+
+    if (len != sizeof(request)) {
+        return -1;
+    }
+
+    uint8_t packet[ONION_MAX_PACKET_SIZE];
+    len = create_onion_packet(packet, sizeof(packet), path, dest.ip_port, request, sizeof(request));
+
+    if (len == -1) {
+        return -1;
+    }
+
+    if (sendpacket(net, path->ip_port1, packet, len) != len) {
+        return -1;
+    }
+
+    return 0;
+}
+
+
 static int handled_test_1;
 static int handle_test_1(void *object, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
 {

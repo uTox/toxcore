@@ -93,23 +93,6 @@ int create_announce_request(uint8_t *packet, uint16_t max_packet_length, const u
 int create_data_request(uint8_t *packet, uint16_t max_packet_length, const uint8_t *public_key,
                         const uint8_t *encrypt_public_key, const uint8_t *nonce, const uint8_t *data, uint16_t length);
 
-/* Create and send an onion announce request packet.
- *
- * path is the path the request will take before it is sent to dest.
- *
- * public_key and secret_key is the kepair which will be used to encrypt the request.
- * ping_id is the ping id that will be sent in the request.
- * client_id is the client id of the node we are searching for.
- * data_public_key is the public key we want others to encrypt their data packets with.
- * sendback_data is the data of ONION_ANNOUNCE_SENDBACK_DATA_LENGTH length that we expect to
- * receive back in the response.
- *
- * return -1 on failure.
- * return 0 on success.
- */
-int send_announce_request(Networking_Core *net, const Onion_Path *path, Node_format dest, const uint8_t *public_key,
-                          const uint8_t *secret_key, const uint8_t *ping_id, const uint8_t *client_id, const uint8_t *data_public_key,
-                          uint64_t sendback_data);
 
 /* Create and send an onion data request packet.
  *

@@ -57,7 +57,7 @@ int create_announce_request(uint8_t *packet, uint16_t max_packet_length, const u
     }
 
     uint8_t plain[ONION_PING_ID_SIZE + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_PUBLIC_KEY_SIZE +
-                  ONION_ANNOUNCE_SENDBACK_DATA_LENGTH];
+                                     ONION_ANNOUNCE_SENDBACK_DATA_LENGTH];
     memcpy(plain, ping_id, ONION_PING_ID_SIZE);
     memcpy(plain + ONION_PING_ID_SIZE, client_id, CRYPTO_PUBLIC_KEY_SIZE);
     memcpy(plain + ONION_PING_ID_SIZE + CRYPTO_PUBLIC_KEY_SIZE, data_public_key, CRYPTO_PUBLIC_KEY_SIZE);
@@ -119,46 +119,6 @@ int create_data_request(uint8_t *packet, uint16_t max_packet_length, const uint8
     }
 
     return DATA_REQUEST_MIN_SIZE + length;
-}
-
-/* Create and send an onion announce request packet.
- *
- * path is the path the request will take before it is sent to dest.
- *
- * public_key and secret_key is the kepair which will be used to encrypt the request.
- * ping_id is the ping id that will be sent in the request.
- * client_id is the client id of the node we are searching for.
- * data_public_key is the public key we want others to encrypt their data packets with.
- * sendback_data is the data of ONION_ANNOUNCE_SENDBACK_DATA_LENGTH length that we expect to
- * receive back in the response.
- *
- * return -1 on failure.
- * return 0 on success.
- */
-int send_announce_request(Networking_Core *net, const Onion_Path *path, Node_format dest, const uint8_t *public_key,
-                          const uint8_t *secret_key, const uint8_t *ping_id, const uint8_t *client_id, const uint8_t *data_public_key,
-                          uint64_t sendback_data)
-{
-    uint8_t request[ONION_ANNOUNCE_REQUEST_SIZE];
-    int len = create_announce_request(request, sizeof(request), dest.public_key, public_key, secret_key, ping_id, client_id,
-                                      data_public_key, sendback_data);
-
-    if (len != sizeof(request)) {
-        return -1;
-    }
-
-    uint8_t packet[ONION_MAX_PACKET_SIZE];
-    len = create_onion_packet(packet, sizeof(packet), path, dest.ip_port, request, sizeof(request));
-
-    if (len == -1) {
-        return -1;
-    }
-
-    if (sendpacket(net, path->ip_port1, packet, len) != len) {
-        return -1;
-    }
-
-    return 0;
 }
 
 /* Create and send an onion data request packet.
@@ -320,7 +280,7 @@ static int handle_announce_request(void *object, IP_Port source, const uint8_t *
     get_shared_key(&onion_a->shared_keys_recv, shared_key, onion_a->dht->self_secret_key, packet_public_key);
 
     uint8_t plain[ONION_PING_ID_SIZE + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_PUBLIC_KEY_SIZE +
-                  ONION_ANNOUNCE_SENDBACK_DATA_LENGTH];
+                                     ONION_ANNOUNCE_SENDBACK_DATA_LENGTH];
     int len = decrypt_data_symmetric(shared_key, packet + 1, packet + 1 + CRYPTO_NONCE_SIZE + CRYPTO_PUBLIC_KEY_SIZE,
                                      ONION_PING_ID_SIZE + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_PUBLIC_KEY_SIZE + ONION_ANNOUNCE_SENDBACK_DATA_LENGTH +
                                      CRYPTO_MAC_SIZE, plain);

@@ -1256,7 +1256,7 @@ static int sendnodes_ipv6(const DHT *dht, IP_Port ip_port, const uint8_t *public
     memcpy(plain + 1 + nodes_length, sendback_data, length);
 
     uint8_t data[1 + nodes_length + length + 1 + CRYPTO_PUBLIC_KEY_SIZE
-                 + CRYPTO_NONCE_SIZE + CRYPTO_MAC_SIZE];
+                   + CRYPTO_NONCE_SIZE + CRYPTO_MAC_SIZE];
 
     int len = DHT_create_packet(dht->self_public_key, shared_encryption_key, NET_PACKET_SEND_NODES_IPV6,
                                 plain, 1 + nodes_length + length, data);
@@ -2527,6 +2527,7 @@ static void do_hardening(DHT *dht)
 
 void cryptopacket_registerhandler(DHT *dht, uint8_t byte, cryptopacket_handler_callback cb, void *object)
 {
+    // Used only by the onion
     dht->cryptopackethandlers[byte].function = cb;
     dht->cryptopackethandlers[byte].object = object;
 }

@@ -99,6 +99,12 @@ test:DHT:
     - cd cmake_build
     - ctest -R dht
 
+test:onion:
+  <<: *cmake_test
+  script:
+    - cd cmake_build
+    - ctest -R onion
+
 test:messenger:
   <<: *cmake_test
   script:

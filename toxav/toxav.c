@@ -28,6 +28,7 @@
 #include "msi.h"
 #include "rtp.h"
 
+#include "../toxcore/tox.h"
 #include "../toxcore/Messenger.h"
 #include "../toxcore/logger.h"
 #include "../toxcore/util.h"
@@ -110,14 +111,14 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
 {
     TOXAV_ERR_NEW rc = TOXAV_ERR_NEW_OK;
     ToxAV *av = NULL;
-    Messenger *m = (Messenger *)tox;
+    Messenger *m = tox->m;
 
     if (tox == NULL) {
         rc = TOXAV_ERR_NEW_NULL;
         goto END;
     }
 
-    if (m->msi_packet) {
+    if (tox->m->msi_packet) {
         rc = TOXAV_ERR_NEW_MULTIPLE;
         goto END;
     }
@@ -136,7 +137,7 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
         goto END;
     }
 
-    av->m = m;
+    av->m = tox->m;
     av->msi = msi_new(av->m);
 
     if (av->msi == NULL) {
@@ -146,7 +147,8 @@ ToxAV *toxav_new(Tox *tox, TOXAV_ERR_NEW *error)
     }
 
     av->interval = 200;
-    av->msi->av = av;
+    av->msi->av  = av;
+    tox->av      = av;
 
     msi_register_callback(av->msi, callback_invite, msi_OnInvite);
     msi_register_callback(av->msi, callback_start, msi_OnStart);
@@ -168,6 +170,7 @@ END:
 
     return av;
 }
+
 void toxav_kill(ToxAV *av)
 {
     if (av == NULL) {
@@ -322,7 +325,7 @@ bool toxav_answer(ToxAV *av, uint32_t friend_number, uint32_t audio_bit_rate, ui
     TOXAV_ERR_ANSWER rc = TOXAV_ERR_ANSWER_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_ANSWER_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -380,7 +383,7 @@ bool toxav_call_control(ToxAV *av, uint32_t friend_number, TOXAV_CALL_CONTROL co
     TOXAV_ERR_CALL_CONTROL rc = TOXAV_ERR_CALL_CONTROL_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_CALL_CONTROL_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -531,7 +534,7 @@ bool toxav_bit_rate_set(ToxAV *av, uint32_t friend_number, int32_t audio_bit_rat
     TOXAV_ERR_BIT_RATE_SET rc = TOXAV_ERR_BIT_RATE_SET_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_BIT_RATE_SET_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -657,7 +660,7 @@ bool toxav_audio_send_frame(ToxAV *av, uint32_t friend_number, const int16_t *pc
     TOXAV_ERR_SEND_FRAME rc = TOXAV_ERR_SEND_FRAME_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_SEND_FRAME_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -742,7 +745,7 @@ bool toxav_video_send_frame(ToxAV *av, uint32_t friend_number, uint16_t width, u
     TOXAV_ERR_SEND_FRAME rc = TOXAV_ERR_SEND_FRAME_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_SEND_FRAME_FRIEND_NOT_FOUND;
         goto END;
     }
@@ -1032,12 +1035,12 @@ ToxAVCall *call_new(ToxAV *av, uint32_t friend_number, TOXAV_ERR_CALL *error)
     TOXAV_ERR_CALL rc = TOXAV_ERR_CALL_OK;
     ToxAVCall *call = NULL;
 
-    if (m_friend_exists(av->m, friend_number) == 0) {
+    if (m_friend_exists(av->m->tox, friend_number) == 0) {
         rc = TOXAV_ERR_CALL_FRIEND_NOT_FOUND;
         goto END;
     }
 
-    if (m_get_friend_connectionstatus(av->m, friend_number) < 1) {
+    if (m_get_friend_connectionstatus(av->m->tox, friend_number) < 1) {
         rc = TOXAV_ERR_CALL_FRIEND_NOT_CONNECTED;
         goto END;
     }

@@ -26,6 +26,7 @@
 
 #include "groupav.h"
 
+
 /* Create a new toxav group.
  *
  * return group number on success.

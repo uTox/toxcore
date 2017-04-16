@@ -27,14 +27,14 @@
 #include "config.h"
 #endif
 
-#include "ping.h"
+#include <stdint.h>
 
 #include "DHT.h"
-#include "network.h"
-#include "ping_array.h"
-#include "util.h"
+#include "ping.h"
 
-#include <stdint.h>
+#include "network.h"
+#include "util.h"
+#include "ping_array.h"
 
 #define PING_NUM_MAX 512
 
@@ -134,9 +134,9 @@ static int send_ping_response(PING *ping, IP_Port ipp, const uint8_t *public_key
     return sendpacket(ping->dht->net, ipp, pk, sizeof(pk));
 }
 
-static int handle_ping_request(void *object, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
+static int handle_ping_request(void *_dht, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
 {
-    DHT       *dht = (DHT *)object;
+    DHT       *dht = _dht;
     int        rc;
 
     if (length != DHT_PING_SIZE) {
@@ -177,9 +177,9 @@ static int handle_ping_request(void *object, IP_Port source, const uint8_t *pack
     return 0;
 }
 
-static int handle_ping_response(void *object, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
+static int handle_ping_response(void *_dht, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
 {
-    DHT      *dht = (DHT *)object;
+    DHT      *dht = (DHT *)_dht;
     int       rc;
 
     if (length != DHT_PING_SIZE) {
@@ -236,34 +236,6 @@ static int handle_ping_response(void *object, IP_Port source, const uint8_t *pac
     return 0;
 }
 
-/* Check if public_key with ip_port is in the list.
- *
- * return 1 if it is.
- * return 0 if it isn't.
- */
-static int in_list(const Client_data *list, uint16_t length, const uint8_t *public_key, IP_Port ip_port)
-{
-    unsigned int i;
-
-    for (i = 0; i < length; ++i) {
-        if (id_equal(list[i].public_key, public_key)) {
-            const IPPTsPng *ipptp;
-
-            if (ip_port.ip.family == AF_INET) {
-                ipptp = &list[i].assoc4;
-            } else {
-                ipptp = &list[i].assoc6;
-            }
-
-            if (!is_timeout(ipptp->timestamp, BAD_NODE_TIMEOUT) && ipport_equal(&ipptp->ip_port, &ip_port)) {
-                return 1;
-            }
-        }
-    }
-
-    return 0;
-}
-
 /* Add nodes to the to_ping list.
  * All nodes in this list are pinged every TIME_TO_PING seconds
  * and are then removed from the list.
@@ -281,10 +253,6 @@ int add_to_ping(PING *ping, const uint8_t *public_key, IP_Port ip_port)
     }
 
     if (!node_addable_to_close_list(ping->dht, public_key, ip_port)) {
-        return -1;
-    }
-
-    if (in_list(ping->dht->close_clientlist, LCLIENT_LIST, public_key, ip_port)) {
         return -1;
     }
 

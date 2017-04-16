@@ -309,7 +309,7 @@ typedef struct {
     void *object;
 } Packet_Handles;
 
-typedef struct {
+typedef struct Networking_Core {
     Logger *log;
     Packet_Handles packethandlers[256];
 

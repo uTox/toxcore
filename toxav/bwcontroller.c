@@ -63,7 +63,7 @@ struct BWController_s {
     } rcvpkt; /* To calculate average received packet */
 };
 
-int bwc_handle_data(Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object);
+int bwc_handle_data(Tox *tox, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object);
 void send_update(BWController *bwc);
 
 BWController *bwc_new(Messenger *m, uint32_t friendnumber,
@@ -86,7 +86,7 @@ BWController *bwc_new(Messenger *m, uint32_t friendnumber,
         rb_write(retu->rcvpkt.rb, retu->rcvpkt.rb_s + i);
     }
 
-    m_callback_rtp_packet(m, friendnumber, BWC_PACKET_ID, bwc_handle_data, retu);
+    m_callback_rtp_packet(m->tox, friendnumber, BWC_PACKET_ID, bwc_handle_data, retu);
 
     return retu;
 }
@@ -96,7 +96,7 @@ void bwc_kill(BWController *bwc)
         return;
     }
 
-    m_callback_rtp_packet(bwc->m, bwc->friend_number, BWC_PACKET_ID, NULL, NULL);
+    m_callback_rtp_packet(bwc->m->tox, bwc->friend_number, BWC_PACKET_ID, NULL, NULL);
 
     rb_kill(bwc->rcvpkt.rb);
     free(bwc);
@@ -174,7 +174,7 @@ void send_update(BWController *bwc)
             b_msg->recv = htonl(bwc->cycle.recv);
 
             if (-1 == m_send_custom_lossy_packet(bwc->m, bwc->friend_number, p_msg, sizeof(p_msg))) {
-                LOGGER_WARNING(bwc->m->log, "BWC send failed (len: %d)! std error: %s", sizeof(p_msg), strerror(errno));
+                LOGGER_WARNING("BWC send failed (len: %d)! std error: %s", sizeof(p_msg), strerror(errno));
             }
         }
 
@@ -206,7 +206,7 @@ static int on_update(BWController *bwc, const struct BWCMessage *msg)
 
     return 0;
 }
-int bwc_handle_data(Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object)
+int bwc_handle_data(Tox *tox, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object)
 {
     if (length - 1 != sizeof(struct BWCMessage)) {
         return -1;

@@ -8,6 +8,10 @@ Icon?
 ethumbs.db
 Thumbs.db
 *.tmp
+.dir-locals.el
+GPATH
+GRTAGS
+GTAGS
 
 # Make
 /_build
@@ -16,6 +20,7 @@ Thumbs.db
 CMakeCache.txt
 CMakeFiles
 Makefile
+Makefile.user
 cmake_install.cmake
 install_manifest.txt
 tags
@@ -82,3 +87,4 @@ cscope.files
 
 # rpm
 tox.spec
+

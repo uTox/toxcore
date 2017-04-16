@@ -26,20 +26,7 @@
 #endif
 
 #include "friend_requests.h"
-
 #include "util.h"
-
-/* Set and get the nospam variable used to prevent one type of friend request spam. */
-void set_nospam(Friend_Requests *fr, uint32_t num)
-{
-    fr->nospam = num;
-}
-
-uint32_t get_nospam(const Friend_Requests *fr)
-{
-    return fr->nospam;
-}
-
 
 /* Set the function that will be executed when a friend request is received. */
 void callback_friendrequest(Friend_Requests *fr, void (*function)(void *, const uint8_t *, const uint8_t *, size_t,
@@ -110,7 +97,7 @@ static int friendreq_handlepacket(void *object, const uint8_t *source_pubkey, co
 {
     Friend_Requests *fr = (Friend_Requests *)object;
 
-    if (length <= 1 + sizeof(fr->nospam) || length > ONION_CLIENT_MAX_DATA_SIZE) {
+    if (length <= 1 + sizeof(fr->crypto->nospam) || length > ONION_CLIENT_MAX_DATA_SIZE) {
         return 1;
     }
 
@@ -125,7 +112,7 @@ static int friendreq_handlepacket(void *object, const uint8_t *source_pubkey, co
         return 1;
     }
 
-    if (memcmp(packet, &fr->nospam, sizeof(fr->nospam)) != 0) {
+    if (memcmp(packet, &fr->crypto->nospam, sizeof(fr->crypto->nospam)) != 0) {
         return 1;
     }
 
@@ -137,16 +124,16 @@ static int friendreq_handlepacket(void *object, const uint8_t *source_pubkey, co
 
     addto_receivedlist(fr, source_pubkey);
 
-    uint32_t message_len = length - sizeof(fr->nospam);
+    uint32_t message_len = length - sizeof(fr->crypto->nospam);
     uint8_t message[message_len + 1];
-    memcpy(message, packet + sizeof(fr->nospam), message_len);
+    memcpy(message, packet + sizeof(fr->crypto->nospam), message_len);
     message[sizeof(message) - 1] = 0; /* Be sure the message is null terminated. */
 
     (*fr->handle_friendrequest)(fr->handle_friendrequest_object, source_pubkey, message, message_len, userdata);
     return 0;
 }
 
-void friendreq_init(Friend_Requests *fr, Friend_Connections *fr_c)
+void friendreq_init(Friend_Requests *fr, Tox_Connections *fr_c)
 {
-    set_friend_request_callback(fr_c, &friendreq_handlepacket, fr);
+    set_tox_conn_request_callback(fr_c, &friendreq_handlepacket, fr);
 }

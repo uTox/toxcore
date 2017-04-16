@@ -28,6 +28,7 @@
 #endif
 
 #include "net_crypto.h"
+#include "LAN_discovery.h"
 
 #include "util.h"
 
@@ -1712,6 +1713,16 @@ static int crypto_connection_add_source(Net_Crypto *c, int crypt_connection_id, 
     return -1;
 }
 
+/* Set and get the nospam variable used to prevent one type of friend request spam. */
+void set_nospam(Net_Crypto *crypto, uint32_t num)
+{
+    crypto->nospam = num;
+}
+
+uint32_t get_nospam(const Net_Crypto *crypto)
+{
+    return crypto->nospam;
+}
 
 /* Set function to be called when someone requests a new connection to us.
  *

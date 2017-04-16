@@ -65,7 +65,8 @@ static void print_client_id(uint8_t *public_key)
     }
 }
 
-static void print_hardening(Hardening *h)
+#if 0
+void print_hardening(Hardening *h)
 {
     printf("Hardening:\n");
     printf("routes_requests_ok: %hhu\n", h->routes_requests_ok);
@@ -155,7 +156,7 @@ static void print_friendlist(DHT *dht)
     }
 }
 
-#if 0 /* TODO(slvr): */
+#if 0 / * TODO(slvr): * /
 static void printpacket(uint8_t *data, uint32_t length, IP_Port ip_port)
 {
     uint32_t i;
@@ -172,6 +173,8 @@ static void printpacket(uint8_t *data, uint32_t length, IP_Port ip_port)
 
     printf("\n--------------------END-----------------------------\n\n\n");
 }
+
+#endif
 #endif
 
 int main(int argc, char *argv[])
@@ -257,8 +260,8 @@ int main(int argc, char *argv[])
 #endif
         networking_poll(dht->net, NULL);
 
-        print_clientlist(dht);
-        print_friendlist(dht);
+        //print_clientlist(dht);
+        //print_friendlist(dht);
         c_sleep(300);
     }
 }

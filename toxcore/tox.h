@@ -176,6 +176,7 @@ uint32_t tox_version_major(void);
 
 uint32_t tox_version_minor(void);
 
+
 /**
  * The patch or revision number. Incremented when bugfixes are applied without
  * changing any functionality or API or ABI.
@@ -490,6 +491,16 @@ typedef void tox_log_cb(Tox *tox, TOX_LOG_LEVEL level, const char *file, uint32_
  * will become opaque (i.e. the definition will become private) in v0.2.0.
  */
 struct Tox_Options {
+    bool enable_messenger;
+
+    bool enable_mdevice;
+
+    bool enable_groupchats;
+
+    /**
+     * Send a copy of every message to a friend, to all connected devices.
+     */
+    bool send_message_to_devices;
 
     /**
      * The type of socket to create.
@@ -740,7 +751,25 @@ void tox_options_free(struct Tox_Options *options);
  * :: Creation and destruction
  *
  ******************************************************************************/
+typedef struct Messenger    Messenger;
+typedef struct MDevice      MDevice;
+typedef struct Group_Chats  Group_Chats;
+typedef struct ToxAV        ToxAV;
 
+typedef struct Logger       Logger;
+
+typedef struct Netcore      Netcore;
+
+struct Tox {
+    Messenger   *m;
+    MDevice     *mdev;
+    Group_Chats *gc;
+    ToxAV       *av;
+
+    Logger      *log;
+
+    Netcore     *ncore;
+};
 
 
 typedef enum TOX_ERR_NEW {
@@ -1037,12 +1066,199 @@ void tox_self_get_secret_key(const Tox *tox, uint8_t *secret_key);
 
 /*******************************************************************************
  *
+ * :: Internal device control (Tox address/id)
+ *
+ ******************************************************************************/
+typedef enum TOX_ERR_DEVICE_ADD {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_DEVICE_ADD_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_DEVICE_ADD_NULL,
+
+    /**
+     * The length of the name exceeded
+     * TOX_MAX_NAME_LENGTH.
+     */
+    TOX_ERR_DEVICE_ADD_TOO_LONG,
+
+    /**
+     * The friend address was not a valid address.
+     */
+    TOX_ERR_DEVICE_ADD_BAD_KEY,
+
+    /**
+     * The friend address belongs to the sending client.
+     */
+    TOX_ERR_DEVICE_ADD_OWN_KEY,
+
+    /**
+     * The device has previously been removed and is permanently blacklisted.
+     */
+    TOX_ERR_DEVICE_ADD_BLACKLISTED,
+
+    /**
+     * The device has already been added.
+     */
+    TOX_ERR_DEVICE_ADD_EXISTS,
+
+    /**
+     * The device could not be added due to an internal, such as a memory allocation failure.
+     */
+    TOX_ERR_DEVICE_ADD_INTERNAL,
+
+} TOX_ERR_DEVICE_ADD;
+
+typedef enum TOX_ERR_DEVICE_GET {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_DEVICE_GET_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_DEVICE_GET_NULL,
+
+    /**
+     * The device does not exist
+     */
+    TOX_ERR_DEVICE_GET_NODEV,
+
+} TOX_ERR_DEVICE_GET;
+
+typedef enum TOX_ERR_BLACKLISTED_DEVICE_GET {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_BLACKLISTED_DEVICE_GET_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_BLACKLISTED_DEVICE_GET_NULL,
+
+    /**
+     * The device does not exist
+     */
+    TOX_ERR_BLACKLISTED_DEVICE_GET_NODEV,
+
+} TOX_ERR_BLACKLISTED_DEVICE_GET;
+
+typedef enum TOX_ERR_DEVICE_DEL {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_DEVICE_DEL_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_DEVICE_DEL_NULL,
+
+    /**
+     * The device does not exist
+     */
+    TOX_ERR_DEVICE_DEL_NODEV,
+
+} TOX_ERR_DEVICE_DEL;
+
+typedef enum TOX_DEVICE_STATUS {
+
+    /**
+     * You have added the device, but it has not accepted you back.
+     */
+    TOX_DEVICE_STATUS_PENDING,
+
+    /**
+     * The device has accepted to synchronize with you, but is not currently online.
+     */
+    TOX_DEVICE_STATUS_CONFIRMED,
+
+    /**
+     * The device has accepted to synchronize with you, and is online.
+     */
+    TOX_DEVICE_STATUS_ONLINE,
+
+} TOX_DEVICE_STATUS;
+
+/**
+ * Add a device, if it adds you in return, you and it become associated
+ * @param name User-friendly name of the device, may be NULL if length is 0
+ * @param length Length of the name
+ * @param address Public key part of the Tox ID of that device
+ */
+bool tox_self_add_device(Tox *tox, const uint8_t* name, size_t length,
+                         const uint8_t *address, TOX_ERR_DEVICE_ADD *error);
+
+/**
+ * Returns the number of associated devices
+ */
+uint32_t tox_self_get_device_count(const Tox *tox);
+
+/**
+ * Retreives the public-key, status and null-terminated name of an associated device
+ * @param name A pointer to an array of MAX_NAME_LENGTH+1 bytes, optionally NULL
+ * @param status Pointer to which the status will be written, optionally NULL
+ */
+bool tox_self_get_device(Tox *tox, uint32_t device_num, uint8_t* name, TOX_DEVICE_STATUS *status,
+                         uint8_t *public_key, TOX_ERR_DEVICE_GET *error);
+
+/**
+* Returns the number of permanently blacklisted devices
+*/
+uint32_t tox_self_get_blacklisted_device_count(const Tox *tox);
+
+/**
+ * Retreives the public-key of a permanently blacklisted device
+ */
+bool tox_self_get_blacklisted_device(Tox *tox, uint32_t device_num, uint8_t *public_key,
+                                     TOX_ERR_BLACKLISTED_DEVICE_GET *error);
+
+/**
+ * Permanently removes and blacklists an associated device
+ * Use this function if the device was lost or stolen
+ */
+bool tox_self_delete_device(Tox *tox, const uint8_t *address, TOX_ERR_DEVICE_DEL *error);
+
+
+/**
+ * [tox_device_sent_message_cb description]
+ * @param tox            [description]
+ * @param sending_device [description]
+ * @param target_friend  [description]
+ * @param type           [description]
+ * @param msg            [description]
+ * @param msg_length     [description]
+ */
+typedef void tox_mdev_sent_message_cb(Tox *tox, uint32_t sending_device, uint32_t target_friend,
+                                      TOX_MESSAGE_TYPE type, const uint8_t *msg, size_t msg_length,
+                                      void *userdata);
+
+/**
+ * [tox_callback_device_sent_message description]
+ * @param tox      [description]
+ * @param callback [description]
+ * @param userdata [description]
+ */
+void tox_callback_mdev_sent_message(Tox *tox, void (*callback)(Tox *tox, uint32_t sending_device, uint32_t target_friend,
+                                        uint8_t type, const uint8_t *msg, size_t msg_length,
+                                        void *userdata));
+
+
+/*******************************************************************************
+ *
  * :: User-visible client information (nickname/status)
  *
  ******************************************************************************/
-
-
-
 /**
  * Common error codes for all functions that set a piece of user-visible
  * client information.
@@ -1105,6 +1321,22 @@ size_t tox_self_get_name_size(const Tox *tox);
 void tox_self_get_name(const Tox *tox, uint8_t *name);
 
 /**
+ * @param device_number The number of the device sending the name change.
+ * @param name A byte array containing the same data as
+ *   tox_self_get_name would write to its `name` parameter.
+ * @param len A value equal to the return value of
+ *   tox_self_get_name_size.
+ */
+typedef void tox_mdev_self_name_cb(Tox *tox, uint32_t device_number, const uint8_t *name, size_t len, void *user_data);
+
+/**
+ * Set the callback for the `change_self_name` set by other device event. Pass NULL to unset.
+ *
+ * This event is triggered when a remote device changes the user's name.
+ */
+void tox_callback_mdev_self_name(Tox *tox, tox_mdev_self_name_cb *callback);
+
+/**
  * Set the client's status message.
  *
  * Status message length cannot exceed TOX_MAX_STATUS_MESSAGE_LENGTH. If
@@ -1138,6 +1370,23 @@ size_t tox_self_get_status_message_size(const Tox *tox);
 void tox_self_get_status_message(const Tox *tox, uint8_t *status_message);
 
 /**
+ * @param device_number The number of the device sending the status message change.
+ * @param status_message A byte array containing the same data as
+ *   tox_self_get_status_message would write to its `status_message` parameter.
+ * @param len A value equal to the return value of
+ *   tox_self_get_status_message_size.
+ */
+typedef void tox_mdev_self_status_message_cb(Tox *tox, uint32_t device_number,
+                                             const uint8_t *status_message, size_t len, void *user_data);
+
+/**
+ * Set the callback for the `change_self_status_message` set by other device event. Pass NULL to unset.
+ *
+ * This event is triggered when a remote device changes the user's status message.
+ */
+void tox_callback_mdev_self_status_message(Tox *tox, tox_mdev_self_status_message_cb *callback);
+
+/**
  * Set the client's user status.
  *
  * @param status One of the user statuses listed in the enumeration above.
@@ -1149,6 +1398,18 @@ void tox_self_set_status(Tox *tox, TOX_USER_STATUS status);
  */
 TOX_USER_STATUS tox_self_get_status(const Tox *tox);
 
+/**
+ * @param device_number The number of the device sending the status message change.
+ * @param state TOX_USER_STATUS, the user state as enumeration above.
+ */
+typedef void tox_mdev_self_state_cb(Tox *tox, uint32_t device_number, TOX_USER_STATUS state, void *user_data);
+
+/**
+ * Set the callback for the `user_state` set by other device event. Pass NULL to unset.
+ *
+ * This event is triggered when a remote device changes the user's state (e.g. Away, DND).
+ */
+void tox_callback_mdev_self_state(Tox *tox, tox_mdev_self_state_cb *callback);
 
 /*******************************************************************************
  *
@@ -1210,6 +1471,58 @@ typedef enum TOX_ERR_FRIEND_ADD {
 
 } TOX_ERR_FRIEND_ADD;
 
+typedef enum TOX_ERR_FRIEND_ADD_DEVICE {
+
+    /**
+     * The function returned successfully.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_OK,
+
+    /**
+     * One of the arguments to the function was NULL when it was not expected.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_NULL,
+
+    /**
+     * The length of the friend request message exceeded
+     * TOX_MAX_FRIEND_REQUEST_LENGTH.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_TOO_LONG,
+
+    /**
+     * The friend request message was empty. This, and the TOO_LONG code will
+     * never be returned from tox_friend_add_norequest.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_NO_MESSAGE,
+
+    /**
+     * The friend address belongs to the sending client.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_OWN_KEY,
+
+    /**
+     * A friend request has already been sent, or the address belongs to a friend
+     * that is already on the friend list.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_ALREADY_SENT,
+
+    /**
+     * The friend address checksum failed.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_BAD_CHECKSUM,
+
+    /**
+     * The friend was already there, but the nospam value was different.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_SET_NEW_NOSPAM,
+
+    /**
+     * A memory allocation failed when trying to increase the friend list size.
+     */
+    TOX_ERR_FRIEND_ADD_DEVICE_MALLOC,
+
+} TOX_ERR_FRIEND_ADD_DEVICE;
+
 
 /**
  * Add a friend to the friend list and send a friend request.
@@ -1236,6 +1549,20 @@ typedef enum TOX_ERR_FRIEND_ADD {
  */
 uint32_t tox_friend_add(Tox *tox, const uint8_t *address, const uint8_t *message, size_t length,
                         TOX_ERR_FRIEND_ADD *error);
+
+/**
+ * Add a new device to existing friend in list.
+ *
+ * friend_number must exist see Friend numbers in tox_friend_add() function above.
+ *
+ * @param public_key A byte array of length TOX_PUBLIC_KEY_SIZE containing the
+ *   Public Key (not the Address) of the friend to add.
+ * @param friend_number the number given by toxcore of the friend, you wish to connect with this device
+ *
+ * @return will return something probably...
+ */
+uint32_t tox_friend_add_device(Tox *tox, const uint8_t *public_key, uint32_t friend_number,
+                               TOX_ERR_FRIEND_ADD_DEVICE *error);
 
 /**
  * Add a friend without sending a friend request.
@@ -1428,6 +1755,23 @@ typedef enum TOX_ERR_FRIEND_QUERY {
     TOX_ERR_FRIEND_QUERY_FRIEND_NOT_FOUND,
 
 } TOX_ERR_FRIEND_QUERY;
+
+
+/**
+ * This function provides no data, and only serves as a notification, clients
+ * are expected to re-sync or validate the data they have.
+ */
+typedef void tox_friend_list_change_cb(Tox *tox, void *userdata);
+
+/**
+ * Set the callback for the `friend_list_change` event. Pass NULL to unset.
+ *
+ * This event is triggered when the friend list changes,
+ * When the friend list is synchronized by Multi-Device.
+ *
+ * TODO: should we call this after toxcore loads a friend list?
+ */
+void tox_callback_friend_list_change(Tox *tox, tox_friend_list_change_cb *callback);
 
 
 /**

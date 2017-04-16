@@ -34,11 +34,7 @@
 /* Maximum number of clients stored per friend. */
 #define MAX_FRIEND_CLIENTS 8
 
-#define LCLIENT_NODES (MAX_FRIEND_CLIENTS)
-#define LCLIENT_LENGTH 128
-
-/* A list of the clients mathematically closest to ours. */
-#define LCLIENT_LIST (LCLIENT_LENGTH * LCLIENT_NODES)
+#define DHT_BUCKET_NODES (MAX_FRIEND_CLIENTS)
 
 #define MAX_CLOSE_TO_BOOTSTRAP_NODES 8
 
@@ -102,70 +98,56 @@ void to_net_family(IP *ip);
 int to_host_family(IP *ip);
 
 typedef struct {
-    IP_Port     ip_port;
-    uint64_t    timestamp;
-} IPPTs;
+    uint8_t     public_key[CRYPTO_PUBLIC_KEY_SIZE];
 
-typedef struct {
-    /* Node routes request correctly (true (1) or false/didn't check (0)) */
-    uint8_t     routes_requests_ok;
-    /* Time which we last checked this.*/
-    uint64_t    routes_requests_timestamp;
-    uint8_t     routes_requests_pingedid[CRYPTO_PUBLIC_KEY_SIZE];
-    /* Node sends correct send_node (true (1) or false/didn't check (0)) */
-    uint8_t     send_nodes_ok;
-    /* Time which we last checked this.*/
-    uint64_t    send_nodes_timestamp;
-    uint8_t     send_nodes_pingedid[CRYPTO_PUBLIC_KEY_SIZE];
-    /* Node can be used to test other nodes (true (1) or false/didn't check (0)) */
-    uint8_t     testing_requests;
-    /* Time which we last checked this.*/
-    uint64_t    testing_timestamp;
-    uint8_t     testing_pingedid[CRYPTO_PUBLIC_KEY_SIZE];
-} Hardening;
-
-typedef struct {
     IP_Port     ip_port;
     uint64_t    timestamp;
     uint64_t    last_pinged;
 
-    Hardening hardening;
-    /* Returned by this node. Either our friend or us. */
-    IP_Port     ret_ip_port;
-    uint64_t    ret_timestamp;
-} IPPTsPng;
+    struct {
+        uint8_t     pk[CRYPTO_PUBLIC_KEY_SIZE];
+        IP_Port     ip_port;
+        uint64_t    timestamp;
+    } ret[DHT_BUCKET_NODES];
 
-typedef struct {
-    uint8_t     public_key[CRYPTO_PUBLIC_KEY_SIZE];
-    IPPTsPng    assoc4;
-    IPPTsPng    assoc6;
 } Client_data;
 
 /*----------------------------------------------------------------------------------*/
 
 typedef struct {
     /* 1 if currently hole punching, otherwise 0 */
-    uint8_t     hole_punching;
+    _Bool     hole_punching;
+
     uint32_t    punching_index;
     uint32_t    tries;
     uint32_t    punching_index2;
 
     uint64_t    punching_timestamp;
-    uint64_t    recvNATping_timestamp;
-    uint64_t    NATping_id;
-    uint64_t    NATping_timestamp;
 } NAT;
 
 #define DHT_FRIEND_MAX_LOCKS 32
 
-typedef struct {
+struct Node_format {
     uint8_t     public_key[CRYPTO_PUBLIC_KEY_SIZE];
     IP_Port     ip_port;
-}
-Node_format;
+};
+
+typedef struct Node_format Node_format;
+
+typedef struct DHT_Bucket {
+    unsigned int deepness;
+    _Bool empty;
+
+    _Bool public_key;
+    uint8_t searched_public_key[CRYPTO_PUBLIC_KEY_SIZE];
+
+    Client_data client_list[DHT_BUCKET_NODES];
+    struct DHT_Bucket *buckets[2];
+} DHT_Bucket;
 
 typedef struct {
     uint8_t     public_key[CRYPTO_PUBLIC_KEY_SIZE];
+
     Client_data client_list[MAX_FRIEND_CLIENTS];
 
     /* Time at which the last get_nodes request was sent. */
@@ -174,7 +156,12 @@ typedef struct {
     uint32_t    bootstrap_times;
 
     /* Symetric NAT hole punching stuff. */
-    NAT         nat;
+    NAT         nat_v4;
+    NAT         nat_v6;
+
+    uint64_t    recvNATping_timestamp;
+    uint64_t    NATping_id;
+    uint64_t    NATping_timestamp;
 
     uint16_t lock_count;
     struct {
@@ -234,18 +221,22 @@ typedef struct {
     void *object;
 } Cryptopacket_Handles;
 
-typedef struct {
+struct DHT {
     Logger *log;
+
     Networking_Core *net;
+    DHT_Bucket bucket_v4;
+    DHT_Bucket bucket_v6;
+    DHT_Bucket bucket_lan;
 
     bool hole_punching_enabled;
 
-    Client_data    close_clientlist[LCLIENT_LIST];
-    uint64_t       close_lastgetnodes;
-    uint32_t       close_bootstrap_times;
+    uint64_t close_lastgetnodes;
+    uint32_t close_bootstrap_times;
 
     /* Note: this key should not be/is not used to transmit any sensitive materials */
-    uint8_t      secret_symmetric_key[CRYPTO_SYMMETRIC_KEY_SIZE];
+    uint8_t secret_symmetric_key[CRYPTO_SYMMETRIC_KEY_SIZE];
+
     /* DHT keypair */
     uint8_t self_public_key[CRYPTO_PUBLIC_KEY_SIZE];
     uint8_t self_secret_key[CRYPTO_SECRET_KEY_SIZE];
@@ -269,7 +260,9 @@ typedef struct {
 
     Node_format to_bootstrap[MAX_CLOSE_TO_BOOTSTRAP_NODES];
     unsigned int num_to_bootstrap;
-} DHT;
+};
+
+typedef struct DHT DHT;
 /*----------------------------------------------------------------------------------*/
 
 /* Shared key generations are costly, it is therefor smart to store commonly used
@@ -364,7 +357,7 @@ int get_close_nodes(const DHT *dht, const uint8_t *public_key, Node_format *node
  *
  * return the number of nodes.
  */
-uint16_t randfriends_nodes(DHT *dht, Node_format *nodes, uint16_t max_num);
+uint16_t randfriends_nodes(const DHT *dht, Node_format *nodes, uint16_t max_num);
 
 /* Put up to max_num nodes in nodes from the closelist.
  *
@@ -411,11 +404,12 @@ int DHT_connect_after_load(DHT *dht);
  */
 int route_packet(const DHT *dht, const uint8_t *public_key, const uint8_t *packet, uint16_t length);
 
-/* Send the following packet to everyone who tells us they are connected to friend_id.
+/* Send the following packet to X nodes who tells us they are connected to friend_pk.
  *
- *  return number of nodes it sent the packet to.
+ *  return number of nodes the packet was sent to.
  */
-int route_tofriend(const DHT *dht, const uint8_t *friend_id, const uint8_t *packet, uint16_t length);
+int route_tofriend(const DHT *dht, const uint8_t *friend_pk, const uint8_t *packet, uint16_t length,
+                   unsigned int num_to_send);
 
 /* Function to handle crypto packets.
  */

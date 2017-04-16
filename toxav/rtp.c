@@ -90,7 +90,7 @@ int rtp_allow_receiving(RTPSession *session)
         return -1;
     }
 
-    if (m_callback_rtp_packet(session->m, session->friend_number, session->payload_type,
+    if (m_callback_rtp_packet(session->m->tox, session->friend_number, session->payload_type,
                               handle_rtp_packet, session) == -1) {
         LOGGER_WARNING(session->m->log, "Failed to register rtp receive handler");
         return -1;
@@ -105,7 +105,7 @@ int rtp_stop_receiving(RTPSession *session)
         return -1;
     }
 
-    m_callback_rtp_packet(session->m, session->friend_number, session->payload_type, NULL, NULL);
+    m_callback_rtp_packet(session->m->tox, session->friend_number, session->payload_type, NULL, NULL);
 
     LOGGER_DEBUG(session->m->log, "Stopped receiving on session: %p", session);
     return 0;
@@ -236,7 +236,6 @@ static struct RTPMessage *new_message(size_t allocate_len, const uint8_t *data, 
 }
 int handle_rtp_packet(Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length, void *object)
 {
-    (void) m;
     (void) friendnumber;
 
     RTPSession *session = (RTPSession *)object;

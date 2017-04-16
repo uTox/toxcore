@@ -6,7 +6,7 @@ include(CTest)
 # versions in a synchronised way.
 set(PROJECT_VERSION_MAJOR "0")
 set(PROJECT_VERSION_MINOR "1")
-set(PROJECT_VERSION_PATCH "4")
+set(PROJECT_VERSION_PATCH "99")
 set(PROJECT_VERSION
   "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
@@ -56,7 +56,7 @@ macro(add_flag flag)
   add_cflag(${flag})
   add_cxxflag(${flag})
 endmacro()
-  
+
 # Set standard version for compiler.
 add_cflag("-std=c99")
 add_cxxflag("-std=c++11")
@@ -275,8 +275,8 @@ target_link_modules(toxnetcrypto toxdht)
 # LAYER 5: Friend requests and connections
 # ----------------------------------------
 add_module(toxfriends
-  toxcore/friend_connection.c
-  toxcore/friend_connection.h
+  toxcore/tox_connection.c
+  toxcore/tox_connection.h
   toxcore/friend_requests.c
   toxcore/friend_requests.h)
 target_link_modules(toxfriends toxnetcrypto)
@@ -285,7 +285,12 @@ target_link_modules(toxfriends toxnetcrypto)
 # ----------------------
 add_module(toxmessenger
   toxcore/Messenger.c
-  toxcore/Messenger.h)
+  toxcore/Messenger.h
+  toxcore/MDevice.c
+  toxcore/MDevice.h
+  toxcore/save.c
+  toxcore/save.h
+)
 target_link_modules(toxmessenger toxfriends)
 
 # LAYER 7: Group chats
@@ -302,7 +307,8 @@ apidsl(
 add_module(toxcore
   toxcore/tox_api.c
   toxcore/tox.c
-  toxcore/tox.h)
+  toxcore/tox.h
+  )
 target_link_modules(toxcore toxgroup)
 
 ################################################################################

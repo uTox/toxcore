@@ -124,7 +124,7 @@ typedef struct {
 typedef int (*oniondata_handler_callback)(void *object, const uint8_t *source_pubkey, const uint8_t *data,
         uint16_t len, void *userdata);
 
-typedef struct {
+typedef struct Onion_Client {
     DHT     *dht;
     Net_Crypto *c;
     Networking_Core *net;
@@ -160,9 +160,11 @@ typedef struct {
     uint64_t last_packet_recv;
 
     unsigned int onion_connected;
+
     bool UDP_connected;
 } Onion_Client;
 
+typedef struct Onion_Client Onion_Client;
 
 /* Add a node to the path_nodes bootstrap array.
  *

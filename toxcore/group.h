@@ -68,7 +68,8 @@ enum {
     GROUPCHAT_CLOSE_ONLINE
 };
 
-typedef struct {
+
+typedef struct Group_c {
     uint8_t status;
 
     Group_Peer *group;
@@ -109,20 +110,22 @@ typedef struct {
     void (*group_on_delete)(void *, int);
 } Group_c;
 
-typedef struct {
+typedef struct Group_Chats {
+    Tox *tox;
     Messenger *m;
-    Friend_Connections *fr_c;
+
+    Netcore *ncore;
 
     Group_c *chats;
     uint32_t num_chats;
 
-    void (*invite_callback)(Messenger *m, uint32_t, int, const uint8_t *, size_t, void *);
-    void (*message_callback)(Messenger *m, uint32_t, uint32_t, int, const uint8_t *, size_t, void *);
-    void (*group_namelistchange)(Messenger *m, int, int, uint8_t, void *);
-    void (*title_callback)(Messenger *m, uint32_t, uint32_t, const uint8_t *, size_t, void *);
+    void (*invite_callback)(Tox *, uint32_t, int, const uint8_t *, size_t, void *);
+    void (*message_callback)(Tox *m, uint32_t, uint32_t, int, const uint8_t *, size_t, void *);
+    void (*group_namelistchange)(Tox *m, int, int, uint8_t, void *);
+    void (*title_callback)(Tox *m, uint32_t, uint32_t, const uint8_t *, size_t, void *);
 
     struct {
-        int (*function)(void *, int, int, void *, const uint8_t *, uint16_t);
+        int (*function)(void *, int, int, void *, const uint8_t *, uint16_t, void *);
     } lossy_packethandlers[256];
 } Group_Chats;
 
@@ -132,14 +135,14 @@ typedef struct {
  *
  *  data of length is what needs to be passed to join_groupchat().
  */
-void g_callback_group_invite(Group_Chats *g_c, void (*function)(Messenger *m, uint32_t, int, const uint8_t *,
+void g_callback_group_invite(Group_Chats *g_c, void (*function)(Tox *tox, uint32_t, int, const uint8_t *,
                              size_t, void *));
 
 /* Set the callback for group messages.
  *
  *  Function(Group_Chats *g_c, int groupnumber, int friendgroupnumber, uint8_t * message, uint16_t length, void *userdata)
  */
-void g_callback_group_message(Group_Chats *g_c, void (*function)(Messenger *m, uint32_t, uint32_t, int, const uint8_t *,
+void g_callback_group_message(Group_Chats *g_c, void (*function)(Tox *tox, uint32_t, uint32_t, int, const uint8_t *,
                               size_t, void *));
 
 
@@ -148,7 +151,7 @@ void g_callback_group_message(Group_Chats *g_c, void (*function)(Messenger *m, u
  * Function(Group_Chats *g_c, int groupnumber, int friendgroupnumber, uint8_t * title, uint8_t length, void *userdata)
  * if friendgroupnumber == -1, then author is unknown (e.g. initial joining the group)
  */
-void g_callback_group_title(Group_Chats *g_c, void (*function)(Messenger *m, uint32_t, uint32_t, const uint8_t *,
+void g_callback_group_title(Group_Chats *g_c, void (*function)(Tox *tox, uint32_t, uint32_t, const uint8_t *,
                             size_t, void *));
 
 /* Set callback function for peer name list changes.
@@ -161,7 +164,7 @@ enum {
     CHAT_CHANGE_PEER_DEL,
     CHAT_CHANGE_PEER_NAME,
 };
-void g_callback_group_namelistchange(Group_Chats *g_c, void (*function)(Messenger *m, int, int, uint8_t, void *));
+void g_callback_group_namelistchange(Group_Chats *g_c, void (*function)(Tox *tox, int, int, uint8_t, void *));
 
 /* Creates a new groupchat and puts it in the chats array.
  *
@@ -296,7 +299,7 @@ int group_names(const Group_Chats *g_c, int groupnumber, uint8_t names[][MAX_NAM
  * Function(void *group object (set with group_set_object), int groupnumber, int friendgroupnumber, void *group peer object (set with group_peer_set_object), const uint8_t *packet, uint16_t length)
  */
 void group_lossy_packet_registerhandler(Group_Chats *g_c, uint8_t byte, int (*function)(void *, int, int, void *,
-                                        const uint8_t *, uint16_t));
+                                        const uint8_t *, uint16_t, void *));
 
 /* High level function to send custom lossy packets.
  *
@@ -309,14 +312,14 @@ int send_group_lossy_packet(const Group_Chats *g_c, int groupnumber, const uint8
  * You should use this to determine how much memory to allocate
  * for copy_chatlist.
  */
-uint32_t count_chatlist(Group_Chats *g_c);
+uint32_t count_chatlist(const Group_Chats *g_c);
 
 /* Copy a list of valid chat IDs into the array out_list.
  * If out_list is NULL, returns 0.
  * Otherwise, returns the number of elements copied.
  * If the array was too small, the contents
  * of out_list will be truncated to list_size. */
-uint32_t copy_chatlist(Group_Chats *g_c, uint32_t *out_list, uint32_t list_size);
+uint32_t copy_chatlist(const Group_Chats *g_c, uint32_t *out_list, uint32_t list_size);
 
 /* return the type of groupchat (GROUPCHAT_TYPE_) that groupnumber is.
  *

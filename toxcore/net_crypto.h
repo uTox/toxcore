@@ -24,8 +24,9 @@
 #ifndef NET_CRYPTO_H
 #define NET_CRYPTO_H
 
-#include "DHT.h"
-#include "LAN_discovery.h"
+#include "crypto_core.h"
+#include "network.h"
+#include "list.h"
 #include "TCP_connection.h"
 #include "logger.h"
 
@@ -190,8 +191,13 @@ typedef struct {
     uint8_t cookie_length;
 } New_Connection;
 
-typedef struct {
+typedef struct DHT DHT;
+
+typedef struct Net_Crypto {
     Logger *log;
+
+    uint32_t nospam; // I don't remember why tux3 put this here, but I'm planning to
+                     // kill it for PoW soon enough. TIF
 
     DHT *dht;
     TCP_Connections *tcp_c;
@@ -220,6 +226,12 @@ typedef struct {
     BS_LIST ip_port_list;
 } Net_Crypto;
 
+typedef struct Node_format Node_format;
+typedef struct TCP_Proxy_Info TCP_Proxy_Info;
+
+/* Set and get the nospam variable used to prevent one type of friend request spam. */
+void set_nospam(Net_Crypto *crypto, uint32_t num);
+uint32_t get_nospam(const Net_Crypto *crypto);
 
 /* Set function to be called when someone requests a new connection to us.
  *

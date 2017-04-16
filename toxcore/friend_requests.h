@@ -24,12 +24,18 @@
 #ifndef FRIEND_REQUESTS_H
 #define FRIEND_REQUESTS_H
 
-#include "friend_connection.h"
+#include "crypto_core.h"
+#include "onion_client.h"
+
+#include <stdint.h>
+
+typedef struct Net_Crypto Net_Crypto;
+typedef struct Tox_Connections Tox_Connections;
 
 #define MAX_FRIEND_REQUEST_DATA_SIZE (ONION_CLIENT_MAX_DATA_SIZE - (1 + sizeof(uint32_t)))
 
 typedef struct {
-    uint32_t nospam;
+    Net_Crypto *crypto;
     void (*handle_friendrequest)(void *, const uint8_t *, const uint8_t *, size_t, void *);
     uint8_t handle_friendrequest_isset;
     void *handle_friendrequest_object;
@@ -45,10 +51,6 @@ typedef struct {
     uint8_t received_requests[MAX_RECEIVED_STORED][CRYPTO_PUBLIC_KEY_SIZE];
     uint16_t received_requests_index;
 } Friend_Requests;
-
-/* Set and get the nospam variable used to prevent one type of friend request spam. */
-void set_nospam(Friend_Requests *fr, uint32_t num);
-uint32_t get_nospam(const Friend_Requests *fr);
 
 /* Remove real_pk from received_requests list.
  *
@@ -70,7 +72,7 @@ void callback_friendrequest(Friend_Requests *fr, void (*function)(void *, const 
 void set_filter_function(Friend_Requests *fr, int (*function)(const uint8_t *, void *), void *userdata);
 
 /* Sets up friendreq packet handlers. */
-void friendreq_init(Friend_Requests *fr, Friend_Connections *fr_c);
+void friendreq_init(Friend_Requests *fr, Tox_Connections *fr_c);
 
 
 #endif

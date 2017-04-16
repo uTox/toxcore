@@ -20,10 +20,12 @@ libtoxcore_la_SOURCES = ../toxcore/DHT.h \
                         ../toxcore/friend_requests.c \
                         ../toxcore/LAN_discovery.h \
                         ../toxcore/LAN_discovery.c \
-                        ../toxcore/friend_connection.h \
-                        ../toxcore/friend_connection.c \
+                        ../toxcore/tox_connection.h \
+                        ../toxcore/tox_connection.c \
                         ../toxcore/Messenger.h \
                         ../toxcore/Messenger.c \
+                        ../toxcore/MDevice.h \
+                        ../toxcore/MDevice.c \
                         ../toxcore/ping.h \
                         ../toxcore/ping.c \
                         ../toxcore/tox.h \
@@ -48,7 +50,9 @@ libtoxcore_la_SOURCES = ../toxcore/DHT.h \
                         ../toxcore/TCP_connection.h \
                         ../toxcore/TCP_connection.c \
                         ../toxcore/list.c \
-                        ../toxcore/list.h
+                        ../toxcore/list.h \
+                        ../toxcore/save.h \
+                        ../toxcore/save.c
 
 libtoxcore_la_CFLAGS =  -I$(top_srcdir) \
                         -I$(top_srcdir)/toxcore \

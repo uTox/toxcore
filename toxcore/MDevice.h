@@ -294,7 +294,7 @@ void do_multidevice(MDevice *mdev);
  * @return         on success returns the newly created MDevice instance
  * @return         on failure returns NULL
  */
-MDevice *mdevice_new(Tox *tox, MDevice_Options *options, unsigned int *error);
+MDevice *mdevice_new(Tox *tox, Netcore *n, MDevice_Options *options, unsigned int *error);
 
 /**
  * Adds a new device to the device list

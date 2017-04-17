@@ -1167,7 +1167,7 @@ void mdev_callback_dev_sent_message(MDevice *mdev, void (*fxn)(Tox *tox, uint32_
  ******************************************************************************/
 
 /* TODO replace the options here with our own! */
-MDevice *mdevice_new(Tox* tox, MDevice_Options *options, unsigned int *error)
+MDevice *mdevice_new(Tox* tox, Netcore *n, MDevice_Options *options, unsigned int *error)
 {
     SET_ERROR_PARAMETER(error, MESSENGER_ERROR_OTHER);
 
@@ -1177,6 +1177,7 @@ MDevice *mdevice_new(Tox* tox, MDevice_Options *options, unsigned int *error)
     }
 
     dev->tox = tox;
+    dev->ncore = n;
     dev->options = *options;
 
     dev->uptime = unix_time();
@@ -1186,13 +1187,13 @@ MDevice *mdevice_new(Tox* tox, MDevice_Options *options, unsigned int *error)
 }
 
 /* Run this before closing shop. */
-void kill_multidevice(MDevice *dev)
+void multidevice_raze(MDevice *dev)
 {
     if (!dev) {
         return;
     }
 
-    uint32_t i;
+    /* TODO more! */
 
     free(dev->devices);
     free(dev);

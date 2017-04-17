@@ -123,11 +123,10 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         m_options.tcp_server_port = tox_options_get_tcp_port(options);
         m_options.hole_punching_enabled = tox_options_get_hole_punching_enabled(options);
         m_options.local_discovery_enabled = tox_options_get_local_discovery_enabled(options);
-
-        mdev_options.send_messages  = options->send_message_to_devices;
-
         m_options.log_callback = (logger_cb *)tox_options_get_log_callback(options);
         m_options.log_user_data = tox_options_get_log_user_data(options);
+
+        mdev_options.send_messages = tox_options_get_mdev_mirror_messages(options);
 
         switch (tox_options_get_proxy_type(options)) {
             case TOX_PROXY_TYPE_HTTP:
@@ -265,7 +264,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
     tox->m = m;
 
-    MDevice *mdev = mdevice_new(tox, &mdev_options, &m_error);
+    MDevice *mdev = mdevice_new(tox, tox->ncore, &mdev_options, &m_error);
     if (!mdev) {
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;

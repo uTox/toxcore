@@ -181,7 +181,7 @@ uint32_t tox_version_minor(void);
  * The patch or revision number. Incremented when bugfixes are applied without
  * changing any functionality or API or ABI.
  */
-#define TOX_VERSION_PATCH              4
+#define TOX_VERSION_PATCH              90
 
 uint32_t tox_version_patch(void);
 
@@ -634,6 +634,9 @@ struct Tox_Options {
      */
     void *log_user_data;
 
+
+    bool mdev_mirror_messages;
+
 };
 
 
@@ -696,6 +699,10 @@ void tox_options_set_log_callback(struct Tox_Options *options, tox_log_cb *callb
 void *tox_options_get_log_user_data(const struct Tox_Options *options);
 
 void tox_options_set_log_user_data(struct Tox_Options *options, void *user_data);
+
+bool tox_options_get_mdev_mirror_messages(const struct Tox_Options *options);
+void tox_options_set_mdev_mirror_messages(struct Tox_Options *options, bool enable_message_mirroring);
+
 
 /**
  * Initialises a Tox_Options object with the default options.

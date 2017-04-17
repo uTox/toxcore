@@ -1383,7 +1383,7 @@ int group_title_get(const Group_Chats *g_c, int groupnumber, uint8_t *title)
     return g->title_len;
 }
 
-static void handle_friend_invite_packet(Messenger *m, uint32_t friendnumber, const uint8_t *data, uint16_t length,
+static void handle_friend_invite_packet(Messenger *m, uint32_t f_num, uint32_t d_num, const uint8_t *data, uint16_t length,
                                         void *userdata)
 {
     Group_Chats *g_c = (Group_Chats *)m->conferences_object;
@@ -1405,7 +1405,7 @@ static void handle_friend_invite_packet(Messenger *m, uint32_t friendnumber, con
 
             if (groupnumber == -1) {
                 if (g_c->invite_callback) {
-                    g_c->invite_callback(m->tox, friendnumber, *(invite_data + sizeof(uint16_t)), invite_data, invite_length, userdata);
+                    g_c->invite_callback(m->tox, f_num, *(invite_data + sizeof(uint16_t)), invite_data, invite_length, userdata);
                 }
 
                 return;
@@ -1451,7 +1451,7 @@ static void handle_friend_invite_packet(Messenger *m, uint32_t friendnumber, con
             memcpy(&other_groupnum, data + 1, sizeof(uint16_t));
             other_groupnum = ntohs(other_groupnum);
 
-            int friendcon_id = getfriendcon_id(g_c->m, friendnumber);
+            int friendcon_id = getfriendcon_id(g_c->m, f_num);
             uint8_t real_pk[CRYPTO_PUBLIC_KEY_SIZE], temp_pk[CRYPTO_PUBLIC_KEY_SIZE];
             toxconn_get_public_keys(real_pk, temp_pk, g_c->ncore->tox_conn, friendcon_id);
 
@@ -2461,7 +2461,7 @@ Group_Chats *new_groupchats(Messenger *m)
 
     temp->m = m;
     temp->m->tox = m->tox;
-    temp->ncore->tox_conn = m->ncore->tox_conn;
+    temp->ncore = m->ncore;
     m->conferences_object = temp;
     m_callback_conference_invite(m, &handle_friend_invite_packet);
 

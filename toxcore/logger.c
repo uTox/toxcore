@@ -53,7 +53,7 @@ void logger_callback_log(Logger *log, logger_cb *function, void *context, void *
     log->userdata = userdata;
 }
 
-void logger_write(Logger *log, LOGGER_LEVEL level, const char *file, int line, const char *func, const char *format,
+void logger_write(Logger *log, LOGGER_LEVEL level, const char *file, uint32_t line, const char *func, const char *format,
                   ...)
 {
     if (!log || !log->callback) {

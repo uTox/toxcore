@@ -88,3 +88,4 @@ cscope.files
 # rpm
 tox.spec
 
+_build_**/

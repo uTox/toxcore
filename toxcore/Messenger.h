@@ -29,7 +29,6 @@
 #include "netcore.h"
 #include "friend_requests.h"
 #include "logger.h"
-#include "tox_connection.h"
 
 #include <stdint.h>
 
@@ -253,7 +252,7 @@ typedef struct {
 } Friend;
 
 // typedef struct MDevice MDevice;
-
+typedef struct Messenger Messenger;
 struct Messenger {
     Tox     *tox;
     Netcore *ncore;
@@ -284,7 +283,7 @@ struct Messenger {
     void (*friend_typingchange)(Tox *tox, uint32_t, bool, void *);
     void (*read_receipt)(Tox *tox, uint32_t, uint32_t, void *);
     void (*friend_connectionstatuschange)(Tox *tox, uint32_t, unsigned int, void *);
-    void (*friend_connectionstatuschange_internal)(Tox *tox, uint32_t, uint8_t, void *);
+    void (*friend_connectionstatuschange_internal)(Messenger *, uint32_t, uint8_t, void *);
     void *friend_connectionstatuschange_internal_userdata;
 
     void *conferences_object; /* Set by new_groupchats()*/
@@ -296,7 +295,7 @@ struct Messenger {
     void (*file_filedata)(Tox *tox, uint32_t, uint32_t, uint64_t, const uint8_t *, size_t, void *);
     void (*file_reqchunk)(Tox *tox, uint32_t, uint32_t, uint64_t, size_t, void *);
 
-    void (*msi_packet)(struct Tox *tox, uint32_t, const uint8_t *, uint16_t, void *);
+    void (*msi_packet)(struct Messenger *, uint32_t, const uint8_t *, uint16_t, void *);
     void *msi_packet_userdata;
 
     void (*lossy_packethandler)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
@@ -308,8 +307,6 @@ struct Messenger {
 
     Messenger_Options options;
 };
-
-typedef struct Messenger Messenger;
 
 /** realloc the friendlist of @m to @num
  *
@@ -547,24 +544,24 @@ void m_callback_friend_list_change(Messenger *m, void (*function)(Tox *tox, void
  *  Function(uint32_t friendnumber, uint8_t *newname, size_t length)
  *  You are not responsible for freeing newname.
  */
-void m_callback_namechange(Messenger *m, void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *));
+void m_callback_namechange(Messenger *m, void (*function)(Tox *, uint32_t, const uint8_t *, size_t, void *));
 
 /* Set the callback for status message changes.
  *  Function(uint32_t friendnumber, uint8_t *newstatus, size_t length)
  *
  *  You are not responsible for freeing newstatus
  */
-void m_callback_statusmessage(Messenger *m, void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *));
+void m_callback_statusmessage(Messenger *m, void (*function)(Tox *, uint32_t, const uint8_t *, size_t, void *));
 
 /* Set the callback for status type changes.
  *  Function(uint32_t friendnumber, USERSTATUS kind)
  */
-void m_callback_userstatus(Messenger *m, void (*function)(Tox *tox, uint32_t, unsigned int, void *));
+void m_callback_userstatus(Messenger *m, void (*function)(Tox *, uint32_t, unsigned int, void *));
 
 /* Set the callback for typing changes.
  *  Function(uint32_t friendnumber, uint8_t is_typing)
  */
-void m_callback_typingchange(Messenger *m, void (*function)(Tox *tox, uint32_t, bool, void *));
+void m_callback_typingchange(Messenger *m, void (*function)(Tox *, uint32_t, bool, void *));
 
 /* Set the callback for read receipts.
  *  Function(uint32_t friendnumber, uint32_t receipt)
@@ -575,7 +572,7 @@ void m_callback_typingchange(Messenger *m, void (*function)(Tox *tox, uint32_t, 
  *  Since core doesn't track ids for you, receipt may not correspond to any message.
  *  In that case, you should discard it.
  */
-void m_callback_read_receipt(Messenger *m, void (*function)(Tox *tox, uint32_t, uint32_t, void *));
+void m_callback_read_receipt(Messenger *m, void (*function)(Tox *, uint32_t, uint32_t, void *));
 
 /* Set the callback for connection status changes.
  *  function(uint32_t friendnumber, uint8_t status)
@@ -588,10 +585,10 @@ void m_callback_read_receipt(Messenger *m, void (*function)(Tox *tox, uint32_t, 
  *  being previously online" part.
  *  It's assumed that when adding friends, their connection status is offline.
  */
-void m_callback_connectionstatus(Messenger *m, void (*function)(Tox *tox, uint32_t, unsigned int, void *));
+void m_callback_connectionstatus(Messenger *m, void (*function)(Tox *, uint32_t, unsigned int, void *));
 
 /* Same as previous but for internal A/V core usage only */
-void m_callback_connectionstatus_internal_av(Messenger *m, void (*function)(Tox *tox, uint32_t, uint8_t, void *),
+void m_callback_connectionstatus_internal_av(Messenger *m, void (*function)(Messenger *, uint32_t, uint8_t, void *),
         void *userdata);
 
 
@@ -727,7 +724,7 @@ uint64_t file_dataremaining(const Messenger *m, int32_t friendnumber, uint8_t fi
  *
  *  Function(Tox *tox, uint32_t friendnumber, uint8_t *data, uint16_t length, void *userdata)
  */
-void m_callback_msi_packet(Messenger *m, void (*function)(Tox *tox, uint32_t, const uint8_t *, uint16_t, void *),
+void m_callback_msi_packet(Messenger *m, void (*function)(Messenger *, uint32_t, const uint8_t *, uint16_t, void *),
                            void *userdata);
 
 /* Send an msi packet.
@@ -797,7 +794,7 @@ enum {
  *
  *  if error is not NULL it will be set to one of the values in the enum above.
  */
-Messenger *messenger_new(Tox* tox, Messenger_Options *options, unsigned int *error);
+Messenger *messenger_new(Logger *l, Netcore *n, Messenger_Options *options, unsigned int *error);
 
 /* Run this before closing shop
  * Free all datastructures.

@@ -18,13 +18,17 @@ typedef struct Netcore {
     Tox             *tox;
 
     Networking_Core *net;
-    Net_Crypto      *net_crypto;
     DHT             *dht;
+    Net_Crypto      *net_crypto;
     Tox_Connections *tox_conn;
 
     Onion           *onion;
     Onion_Announce  *onion_a;
     Onion_Client    *onion_c;
 } Netcore;
+
+
+Netcore *netcore_init(Tox *tox);
+
 
 #endif // TOX_NETCORE

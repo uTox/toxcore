@@ -134,10 +134,10 @@ MSISession *msi_new(Messenger *m)
 
     retu->messenger = m;
 
-    m_callback_msi_packet(m->tox, handle_msi_packet, retu);
+    m_callback_msi_packet(m, handle_msi_packet, retu);
 
     /* This is called when remote terminates session */
-    m_callback_connectionstatus_internal_av(m->tox, on_peer_status, retu);
+    m_callback_connectionstatus_internal_av(m, on_peer_status, retu);
 
     LOGGER_DEBUG(m->log, "New msi session: %p ", retu);
     return retu;
@@ -464,7 +464,7 @@ int send_message(Messenger *m, uint32_t friend_number, const MSIMessage *msg)
     size ++;
 
 
-    if (m_msi_packet(m->tox, friend_number, parsed, size)) {
+    if (m_msi_packet(m, friend_number, parsed, size)) {
         LOGGER_DEBUG(m->log, "Sent message");
         return 0;
     }

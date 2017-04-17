@@ -45,7 +45,7 @@
 
 #define NUM_SAVED_PATH_NODES 8
 
-typedef struct Netcore Netcore;
+typedef struct Tox Tox;
 
 /**
  * Calculates the number of bytes required to store the tox instance with
@@ -53,7 +53,7 @@ typedef struct Netcore Netcore;
  *
  * @see threading for concurrency implications.
  */
-size_t save_get_savedata_size(const Netcore *n);
+size_t save_get_savedata_size(const Tox *tox);
 
 /**
  * Store all information associated with the tox instance to a byte array.
@@ -62,7 +62,7 @@ size_t save_get_savedata_size(const Netcore *n);
  *   Call tox_get_savedata_size to find the number of bytes required. If this parameter
  *   is NULL, this function has no effect.
  */
-void save_get_savedata(const Netcore *n, uint8_t *savedata);
+void save_get_savedata(const Tox *tox, uint8_t *savedata);
 
 /**
  * Writes the header for a save data section of length `len` and type `type` to `data`
@@ -78,7 +78,7 @@ static inline size_t save_subheader_size(void) { return 2*sizeof(uint32_t); }
  * Restores the state of `tox` and its optional components from the saved data
  * Will call the *_save_read_sections_callback for each non-NULL Tox component
  */
-int save_load_from_data(Netcore *n, const uint8_t *data, uint32_t length);
+int save_load_from_data(Tox *tox, const uint8_t *data, uint32_t length);
 
 /* Runs a callback with the content of each section in the save data */
 typedef int (*save_read_sections_callback_func)(void *outer, const uint8_t *data, uint32_t len, uint16_t type);

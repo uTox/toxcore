@@ -29,16 +29,19 @@
 #include "MDevice.h"
 #include "Messenger.h"
 
+#warning save.c is including tox.h still, this is GRAB
+#include "tox.h"
+
 /* Loads the non-otional state from the sections of the saved data */
-static int save_read_sections_tox_callback(Netcore *n, const uint8_t *data, uint32_t length, uint16_t type)
+static int save_read_sections_tox_callback(Tox *tox, const uint8_t *data, uint32_t length, uint16_t type)
 {
     switch (type) {
         case SAVE_STATE_TYPE_NOSPAMKEYS:
             if (length == CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_SECRET_KEY_SIZE + sizeof(uint32_t)) {
-                set_nospam(n->net_crypto, *(uint32_t *)data);
-                load_secret_key(n->net_crypto, (&data[sizeof(uint32_t)]) + CRYPTO_PUBLIC_KEY_SIZE);
+                set_nospam(tox->ncore->net_crypto, *(uint32_t *)data);
+                load_secret_key(tox->ncore->net_crypto, (&data[sizeof(uint32_t)]) + CRYPTO_PUBLIC_KEY_SIZE);
 
-                if (public_key_cmp((&data[sizeof(uint32_t)]), n->net_crypto->self_public_key) != 0) {
+                if (public_key_cmp((&data[sizeof(uint32_t)]), tox->ncore->net_crypto->self_public_key) != 0) {
                     return -1;
                 }
             } else {
@@ -48,7 +51,7 @@ static int save_read_sections_tox_callback(Netcore *n, const uint8_t *data, uint
             break;
 
         case SAVE_STATE_TYPE_DHT:
-            DHT_load(n->dht, data, length);
+            DHT_load(tox->ncore->dht, data, length);
             break;
 
         case SAVE_STATE_TYPE_PATH_NODE: {
@@ -61,7 +64,7 @@ static int save_read_sections_tox_callback(Netcore *n, const uint8_t *data, uint
             int i, num = unpack_nodes(nodes, NUM_SAVED_PATH_NODES, 0, data, length, 0);
 
             for (i = 0; i < num; ++i) {
-                onion_add_bs_path_node(n->onion_c, nodes[i].ip_port, nodes[i].public_key);
+                onion_add_bs_path_node(tox->ncore->onion_c, nodes[i].ip_port, nodes[i].public_key);
             }
 
             break;
@@ -73,7 +76,7 @@ static int save_read_sections_tox_callback(Netcore *n, const uint8_t *data, uint
 
 static int save_read_sections_dispatch(void *outer, const uint8_t *data, uint32_t length, uint16_t type)
 {
-    Netcore *n = outer;
+    Tox *tox = outer;
 
     if (type == SAVE_STATE_TYPE_END) {
         if (length != 0) {
@@ -84,15 +87,15 @@ static int save_read_sections_dispatch(void *outer, const uint8_t *data, uint32_
     }
 
     /* If anyone returns -1, we abort, so only do that if there's a critical error */
-    if (n && messenger_save_read_sections_callback(n, data, length, type) < 0) {
+    if (tox->m && messenger_save_read_sections_callback(tox->m, data, length, type) < 0) {
         return -1;
     }
 
-    // if (n && mdev_save_read_sections_callback(n, data, length, type) < 0) {
+    // if (tox-> && mdev_save_read_sections_callback(tox->, data, length, type) < 0) {
     //     return -1;
     // }
 
-    return save_read_sections_tox_callback(n, data, length, type);
+    return save_read_sections_tox_callback(tox, data, length, type);
 }
 
 uint8_t *save_write_subheader(uint8_t *data, size_t len, uint16_t type, uint32_t cookie)
@@ -110,31 +113,31 @@ uint8_t *save_write_subheader(uint8_t *data, size_t len, uint16_t type, uint32_t
 }
 
 /* Returns the size of the Tox data to be saved */
-static size_t save_tox_size(const Netcore *n)
+static size_t save_tox_size(const Tox *tox)
 {
     uint32_t size32 = sizeof(uint32_t), sizesubhead = size32 * 2;
     return     sizesubhead + sizeof(uint32_t) + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_SECRET_KEY_SIZE
-             + sizesubhead + DHT_size(n->dht)                                 // DHT
+             + sizesubhead + DHT_size(tox->ncore->dht)                                 // DHT
              + sizesubhead + NUM_SAVED_PATH_NODES * packed_node_size(TCP_INET6) //saved path nodes
              ;
 }
 
-size_t save_get_savedata_size(const Netcore *n)
+size_t save_get_savedata_size(const Tox *tox)
 {
     const size_t header_size = sizeof(uint32_t)*2, footer_size = sizeof(uint32_t)*2;
     return header_size
-         + save_tox_size(n)
-         + messenger_size(n)
-         // + mdev_size(n)
+         + save_tox_size(tox)
+         + messenger_size(tox->m)
+         // + mdev_size(tox->)
          + footer_size;
 }
 
-void save_get_savedata(const Netcore *n, uint8_t *data)
+void save_get_savedata(const Tox *tox, uint8_t *data)
 {
     if (!data)
         return;
 
-    size_t data_size = save_get_savedata_size(n);
+    size_t data_size = save_get_savedata_size(tox);
     if (data_size > UINT32_MAX) {
         printf("save_get_savedata: The save file would be bigger than 4GiB, unable to save!\n");
         return;
@@ -153,19 +156,19 @@ void save_get_savedata(const Netcore *n, uint8_t *data)
 
     /* Write mandatory data */
 #ifdef DEBUG
-    assert(sizeof(get_nospam(n->net_crypto)) == sizeof(uint32_t));
+    assert(sizeof(get_nospam(tox->ncore->net_crypto)) == sizeof(uint32_t));
 #endif
     len = size32 + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_SECRET_KEY_SIZE;
     type = SAVE_STATE_TYPE_NOSPAMKEYS;
     data = save_write_subheader(data, len, type, SAVE_STATE_COOKIE_TYPE);
-    *(uint32_t *)data = get_nospam(n->net_crypto);
-    save_keys(n->net_crypto, data + size32);
+    *(uint32_t *)data = get_nospam(tox->ncore->net_crypto);
+    save_keys(tox->ncore->net_crypto, data + size32);
     data += len;
 
-    len = DHT_size(n->dht);
+    len = DHT_size(tox->ncore->dht);
     type = SAVE_STATE_TYPE_DHT;
     data = save_write_subheader(data, len, type, SAVE_STATE_COOKIE_TYPE);
-    DHT_save(n->dht, data);
+    DHT_save(tox->ncore->dht, data);
     data += len;
 
     Node_format nodes[NUM_SAVED_PATH_NODES];
@@ -173,7 +176,7 @@ void save_get_savedata(const Netcore *n, uint8_t *data)
     uint8_t *temp_data = data;
     data = save_write_subheader(data, 0, type, SAVE_STATE_COOKIE_TYPE);
     memset(nodes, 0, sizeof(nodes));
-    // unsigned int num = onion_backup_nodes(n->onion_c, nodes, NUM_SAVED_PATH_NODES);
+    // unsigned int num = onion_backup_nodes(tox->ncore->onion_c, nodes, NUM_SAVED_PATH_NODES);
     // int l = pack_nodes(data, NUM_SAVED_PATH_NODES * packed_node_size(TCP_INET6), nodes, num);
 
     // if (l > 0) {
@@ -183,19 +186,19 @@ void save_get_savedata(const Netcore *n, uint8_t *data)
     // }
 
     /* Add optional sections */
-    if (n) {
-        data = messenger_save(n, data);
+    if (tox->m) {
+        data = messenger_save(tox->m, data);
     }
 
-    // if (n) {
-    //     data = mdev_save(n, data);
+    // if (tox->) {
+    //     data = mdev_save(tox->, data);
     // }
 
     /* Write final section */
     save_write_subheader(data, 0, SAVE_STATE_TYPE_END, SAVE_STATE_COOKIE_TYPE);
 }
 
-int save_load_from_data(Netcore *n, const uint8_t *data, uint32_t length)
+int save_load_from_data(Tox *tox, const uint8_t *data, uint32_t length)
 {
     uint32_t data32[2];
     uint32_t cookie_len = sizeof(data32);
@@ -209,7 +212,7 @@ int save_load_from_data(Netcore *n, const uint8_t *data, uint32_t length)
     if (data32[0]!=0 || data32[1] != SAVE_STATE_COOKIE_GLOBAL)
         return -1;
 
-    return save_read_sections(save_read_sections_dispatch, n, data + cookie_len,
+    return save_read_sections(save_read_sections_dispatch, tox, data + cookie_len,
                                 length - cookie_len, SAVE_STATE_COOKIE_TYPE);
 }
 

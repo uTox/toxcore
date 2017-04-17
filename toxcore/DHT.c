@@ -624,10 +624,11 @@ static int recursive_DHT_bucket_get_nodes(const DHT_Bucket *bucket, Client_data 
     if (bucket->empty) {
         int ret = recursive_DHT_bucket_get_nodes(bucket->buckets[bit], nodes, number, public_key);
 
-        if (ret < 0)
+        if (ret < 0) {
             return -1;
+        }
 
-        if (ret < number) {
+        if ((unsigned)ret < number) { //safe with the above line
             number -= ret;
             int ret1 = recursive_DHT_bucket_get_nodes(bucket->buckets[!bit], nodes, number, public_key);
 
@@ -1126,7 +1127,7 @@ static int sendnodes_ipv6(const DHT *dht, IP_Port ip_port, const uint8_t *public
     return sendpacket(dht->net, ip_port, data, 1 + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_NONCE_SIZE + len);
 }
 
-static int handle_getnodes(void *object, IP_Port source, const uint8_t *packet, uint16_t length)
+static int handle_getnodes(void *object, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
 {
     if (length != (1 + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_NONCE_SIZE + CRYPTO_PUBLIC_KEY_SIZE + sizeof(
                        uint64_t) + CRYPTO_MAC_SIZE))
@@ -1242,7 +1243,7 @@ static int handle_sendnodes_core(void *object, IP_Port source, const uint8_t *pa
     return 0;
 }
 
-static int handle_sendnodes_ipv6(void *object, IP_Port source, const uint8_t *packet, uint16_t length)
+static int handle_sendnodes_ipv6(void *object, IP_Port source, const uint8_t *packet, uint16_t length, void *userdata)
 {
     DHT *dht = object;
     Node_format plain_nodes[MAX_SENT_NODES];
@@ -1683,7 +1684,7 @@ static int send_NATping(DHT *dht, const uint8_t *public_key, uint64_t ping_id, u
 
 /* Handle a received ping request for. */
 static int handle_NATping(void *object, IP_Port source, const uint8_t *source_pubkey, const uint8_t *packet,
-                          uint16_t length)
+                          uint16_t length, void *userdata)
 {
     if (length != sizeof(uint64_t) + 1)
         return 1;
@@ -2328,8 +2329,8 @@ int DHT_load(DHT *dht, const uint8_t *data, uint32_t length)
         lendian_to_host32(&data32, data);
 
         // if (data32 == DHT_STATE_COOKIE_GLOBAL) {
-            // return save_read_sections(dht_load_state_callback, dht, data + cookie_len,
-            //                   length - cookie_len, DHT_STATE_COOKIE_TYPE);
+        //     return save_read_sections(dht_load_state_callback, dht, data + cookie_len,
+        //                       length - cookie_len, DHT_STATE_COOKIE_TYPE);
         // }
     }
 

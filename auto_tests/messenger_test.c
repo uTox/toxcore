@@ -289,7 +289,7 @@ START_TEST(test_messenger_state_saveloadsave)
         ck_assert_msg(buffer[extra + size + i] == 0xCD, "Buffer overwritten from messenger_save() @%u", i);
     }
 
-    int res = messenger_load(m, buffer + extra, size);
+    int res = messenger_load(m->ncore, buffer + extra, size);
 
     if (res == -1) {
         ck_assert_msg(res == 0, "Failed to load back stored buffer: res == -1");
@@ -353,7 +353,7 @@ int main(int argc, char *argv[])
     Messenger_Options options = {0};
     options.ipv6enabled = TOX_ENABLE_IPV6_DEFAULT;
     options.log_callback = (logger_cb *)print_debug_log;
-    m = messenger_new(NULL, &options, 0);
+    m = messenger_new(NULL, NULL, &options, 0);
 
     /* setup a default friend and friendnum */
     if (m_addfriend_norequest(m, (uint8_t *)friend_id) < 0) {

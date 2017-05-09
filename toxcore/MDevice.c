@@ -293,9 +293,10 @@ static bool init_sync_friends(MDevice *mdev, uint32_t dev_num)
     packet[0] = PACKET_ID_MDEV_SYNC;
     packet[1] = MDEV_SYNC_CONTACT_COUNT;
 
+    assert(sizeof(uint32_t) == sizeof(mdev->m->numfriends));
     uint8_t numfriends[sizeof(mdev->m->numfriends)];
-    memcpy(numfriends, &(mdev->m->numfriends), sizeof(uint32_t));
-    host_to_net(numfriends, sizeof(uint32_t));
+    memcpy(numfriends, &mdev->m->numfriends, sizeof(mdev->m->numfriends));
+    host_to_net(numfriends, sizeof(mdev->m->numfriends));
     memcpy(&packet[2], numfriends, sizeof(uint32_t));
 
     return send_mdev_packet(mdev, dev_num, packet, sizeof(packet));

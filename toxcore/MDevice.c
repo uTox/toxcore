@@ -13,34 +13,6 @@
 #define SET_ERROR_PARAMETER(param, x) {if(param) {*param = x;}}
 
 /******************************************************************************
- ******** Multi Device Version Helpers                                 ********
- ******************************************************************************/
-uint32_t toxmd_version_major(void)
-{
-    return TOXMD_VERSION_MAJOR;
-}
-
-uint32_t toxmd_version_minor(void)
-{
-    return TOXMD_VERSION_MINOR;
-}
-
-uint32_t toxmd_version_patch(void)
-{
-    return TOXMD_VERSION_PATCH;
-}
-
-bool toxmd_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
-{
-  return (TOXMD_VERSION_MAJOR == major && /* Force the major version */
-            (TOXMD_VERSION_MINOR > minor || /* Current minor version must be newer than requested -- or -- */
-                (TOXMD_VERSION_MINOR == minor && TOXMD_VERSION_PATCH >= patch) /* the patch must be the same or newer */
-            )
-         );
-}
-
-
-/******************************************************************************
  ******** Multi-device internal helpers                                ********
  ******************************************************************************/
 static int get_device_id(MDevice *dev, const uint8_t *real_pk);
@@ -66,8 +38,9 @@ static int realloc_mdev_list(MDevice *dev, uint32_t num)
 
     Device *new_dev_list = realloc(dev->devices, num * sizeof(Device));
 
-    if (new_dev_list == NULL)
+    if (new_dev_list == NULL) {
         return -1;
+    }
 
     dev->devices = new_dev_list;
     return 0;
@@ -218,8 +191,8 @@ static int mdev_find_pubkey(MDevice *mdev, uint8_t *real_pk)
 }
 
 static int handle_status(void *object, int dev_num, int device_id, uint8_t status, void *userdata);
-static int handle_packet(void *object, int dev_num, int device_id, uint8_t *temp, uint16_t len, void *userdata);
-static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, const uint8_t *packet, uint16_t length);
+static int handle_packet(void *object, int dev_num, int device_id, const uint8_t *temp, uint16_t len, void *userdata);
+static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, const uint8_t *packet, uint16_t length, void *userdata);
 
 static int32_t init_new_device_self(MDevice *mdev, const uint8_t* name, size_t length, const uint8_t *real_pk,
                                     uint8_t status)
@@ -237,7 +210,9 @@ static int32_t init_new_device_self(MDevice *mdev, const uint8_t* name, size_t l
         return FAERR_NOMEM;
     }
 
-    memset(&(mdev->devices[mdev->devices_count]), 0, sizeof(Device));
+    Device *device = &mdev->devices[mdev->devices_count];
+
+    memset(device, 0, sizeof(Device));
 
     int devconn_id = new_tox_conn(mdev->ncore->tox_conn, real_pk);
 
@@ -247,10 +222,10 @@ static int32_t init_new_device_self(MDevice *mdev, const uint8_t* name, size_t l
 
     off_t i = mdev->devices_count;
     mdev->devices_count++;
-    mdev->devices[i].status = status;
-    mdev->devices[i].toxconn_id = devconn_id;
+    device->status = status;
+    device->toxconn_id = devconn_id;
 
-    id_copy(mdev->devices[i].real_pk, real_pk);
+    id_copy(device->real_pk, real_pk);
 
     toxconn_set_callbacks(mdev->ncore->tox_conn,
                           devconn_id,
@@ -263,12 +238,12 @@ static int32_t init_new_device_self(MDevice *mdev, const uint8_t* name, size_t l
                           0); /* sub_device number always 0 for mdevice, */
 
     if (toxconn_is_connected(mdev->ncore->tox_conn, devconn_id) == TOXCONN_STATUS_CONNECTED) {
-        mdev->devices[i].status = MDEV_ONLINE;
+        device->status = MDEV_ONLINE;
         send_online_packet(mdev, i, 0);
     }
 
-    mdev->devices[i].name_length = length;
-    memcpy(mdev->devices[i].name, name, length);
+    device->name_length = length;
+    memcpy(device->name, name, length);
 
     return i;
 }
@@ -294,7 +269,7 @@ static void set_mdevice_status(MDevice *mdev, uint32_t dev_num, MDEV_STATUS stat
  * Ruturns false if something is in an unexpected state  */
 static bool sync_allowed(MDevice *mdev, MDEV_INTERN_SYNC_ERR *error)
 {
-    if (!mdev->m->friend_list_change) {
+    if (!mdev->friend_list_change) {
         printf("callback not set\n");
         SET_ERROR_PARAMETER(error, MDEV_INTERN_SYNC_ERR_CALLBACK_NOT_SET);
         return 0;
@@ -915,9 +890,9 @@ static int handle_packet_sync(MDevice *mdev, uint32_t dev_num, uint8_t *pkt, uin
                 mdev->devices[dev_num].sync_status  = MDEV_SYNC_STATUS_DONE;
                 if (send_mdev_sync_packet(mdev, dev_num, MDEV_SYNC_CONTACT_COMMIT)){
                     sync_friend_commit(mdev, dev_num);
-                    if (mdev->m->friend_list_change) {
+                    if (mdev->friend_list_change) {
                         // TODO this doesn't belong in messenger move to MDevice
-                        mdev->m->friend_list_change(mdev->tox, userdata);
+                        mdev->friend_list_change(mdev->tox, userdata);
                     }
                 }
             } else {
@@ -932,8 +907,8 @@ static int handle_packet_sync(MDevice *mdev, uint32_t dev_num, uint8_t *pkt, uin
             printf("commit packet received, going to commit!\n");
             if (mdev->devices[dev_num].sync_role == MDEV_SYNC_ROLE_SECONDARY) {
                 sync_friend_commit(mdev, dev_num);
-                if (mdev->m->friend_list_change) {
-                    mdev->m->friend_list_change(mdev->tox, userdata);
+                if (mdev->friend_list_change) {
+                    mdev->friend_list_change(mdev->tox, userdata);
                 }
             }
             break;
@@ -956,7 +931,7 @@ static int handle_packet_sync(MDevice *mdev, uint32_t dev_num, uint8_t *pkt, uin
     return 0;
 }
 
-static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt, uint16_t len, void *userdata)
+static int handle_packet(void *object, int dev_num, int device_id, const uint8_t *pkt, uint16_t len, void *userdata)
 {
     printf("handle_packet MDEV dev_num %i // dev_id %i // pkt %u // length %u \n", dev_num, device_id, pkt[0], len);
 
@@ -1002,7 +977,7 @@ static int handle_packet(void *object, int dev_num, int device_id, uint8_t *pkt,
 }
 
 
-static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, const uint8_t *packet, uint16_t length)
+static int handle_custom_lossy_packet(void *object, int dev_num, int device_id, const uint8_t *packet, uint16_t length, void *userdata)
 {
     printf("handle_custom_lossy_packet MDEV\n");
     return 0;
@@ -1140,6 +1115,12 @@ bool mdev_get_dev_pubkey(MDevice *mdev, uint32_t number, uint8_t pk[CRYPTO_PUBLI
 /******************************************************************************
  ******** Multi-device set callbacks                                   ********
  ******************************************************************************/
+void mdev_callback_friend_list_change(MDevice *mdev, void (*function)(Tox *tox, void *userdata))
+{
+    mdev->friend_list_change = function;
+}
+
+
 void mdev_callback_self_name(MDevice *mdev, void (*fxn)(Tox *tox, uint32_t device_number, const uint8_t *name, size_t len, void *user_data))
 {
     mdev->self_name_change = fxn;
@@ -1237,7 +1218,9 @@ static int get_removed_device_id(MDevice *dev, const uint8_t *real_pk)
 
 int mdev_add_new_device_self(MDevice *mdev, const uint8_t* name, size_t length, const uint8_t *real_pk)
 {
+    // WEEE magic numbers!
     if (!public_key_valid(real_pk)) {
+        // TODO enum these magic numbers
         return -2;
     }
 

@@ -176,23 +176,23 @@ void save_get_savedata(const Tox *tox, uint8_t *data)
     uint8_t *temp_data = data;
     data = save_write_subheader(data, 0, type, SAVE_STATE_COOKIE_TYPE);
     memset(nodes, 0, sizeof(nodes));
-    // unsigned int num = onion_backup_nodes(tox->ncore->onion_c, nodes, NUM_SAVED_PATH_NODES);
-    // int l = pack_nodes(data, NUM_SAVED_PATH_NODES * packed_node_size(TCP_INET6), nodes, num);
+    unsigned int num = onion_backup_nodes(tox->ncore->onion_c, nodes, NUM_SAVED_PATH_NODES);
+    int l = pack_nodes(data, NUM_SAVED_PATH_NODES * packed_node_size(TCP_INET6), nodes, num);
 
-    // if (l > 0) {
-    //     len = l;
-    //     data = save_write_subheader(temp_data, len, type, SAVE_STATE_COOKIE_TYPE);
-    //     data += len;
-    // }
+    if (l > 0) {
+        len = l;
+        data = save_write_subheader(temp_data, len, type, SAVE_STATE_COOKIE_TYPE);
+        data += len;
+    }
 
     /* Add optional sections */
     if (tox->m) {
         data = messenger_save(tox->m, data);
     }
 
-    // if (tox->) {
-    //     data = mdev_save(tox->, data);
-    // }
+    if (tox->mdev) {
+        data = mdev_save(tox->mdev, data);
+    }
 
     /* Write final section */
     save_write_subheader(data, 0, SAVE_STATE_TYPE_END, SAVE_STATE_COOKIE_TYPE);

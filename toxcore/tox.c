@@ -175,7 +175,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
-    tox->ncore = calloc(1, sizeof(Netcore));
+    tox->ncore = netcore_init(tox);
     if (!tox->ncore) {
         free(tox);
         return NULL;
@@ -319,7 +319,7 @@ size_t tox_get_savedata_size(const Tox *tox)
 void tox_get_savedata(const Tox *tox, uint8_t *savedata)
 {
     if (savedata) {
-        messenger_save(tox->m, savedata);
+        save_get_savedata(tox, savedata);
     }
 }
 
@@ -934,7 +934,7 @@ void tox_self_get_friend_list(const Tox *tox, uint32_t *friend_list)
 
 void tox_callback_friend_list_change(Tox *tox, tox_friend_list_change_cb *function)
 {
-    m_callback_friend_list_change(tox->m, function);
+    mdev_callback_friend_list_change(tox->mdev, function);
 }
 
 

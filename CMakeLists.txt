@@ -198,8 +198,7 @@ set(toxcore_PKGCONFIG_LIBS)
 
 # LAYER 1: Crypto core
 # --------------------
-apidsl(
-  toxcore/crypto_core.api.h)
+apidsl(toxcore/crypto_core.api.h)
 add_module(toxcrypto
   toxcore/crypto_core.c
   toxcore/crypto_core.h
@@ -220,7 +219,8 @@ add_module(toxnetwork
   toxcore/network.c
   toxcore/network.h
   toxcore/util.c
-  toxcore/util.h)
+  toxcore/util.h
+  )
 target_link_modules(toxnetwork toxcrypto)
 
 if(CMAKE_THREAD_LIBS_INIT)
@@ -305,8 +305,7 @@ target_link_modules(toxgroup toxmessenger)
 
 # LAYER 8: Public API
 # -------------------
-apidsl(
-  toxcore/tox.api.h)
+# apidsl(toxcore/tox.api.h)
 add_module(toxcore
   toxcore/tox_api.c
   toxcore/tox.c
@@ -321,8 +320,7 @@ target_link_modules(toxcore toxgroup)
 ################################################################################
 
 if(BUILD_TOXAV)
-  apidsl(
-    toxav/toxav.api.h)
+  # apidsl(toxav/toxav.api.h)
   add_module(toxav
     toxav/audio.c
     toxav/audio.h
@@ -354,8 +352,7 @@ add_module(toxdns
   toxdns/toxdns.c)
 target_link_modules(toxdns toxcore)
 
-apidsl(
-  toxencryptsave/toxencryptsave.api.h)
+# apidsl(toxencryptsave/toxencryptsave.api.h)
 add_module(toxencryptsave
   toxencryptsave/toxencryptsave.c
   toxencryptsave/toxencryptsave.h)

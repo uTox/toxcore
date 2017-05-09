@@ -149,7 +149,7 @@ int msi_kill(MSISession *session, Logger *log)
         return -1;
     }
 
-    m_callback_msi_packet(session->messenger->tox, NULL, NULL);
+    m_callback_msi_packet(session->messenger, NULL, NULL);
 
     if (pthread_mutex_trylock(session->mutex) != 0) {
         LOGGER_ERROR(session->messenger->log, "Failed to aquire lock on msi mutex");

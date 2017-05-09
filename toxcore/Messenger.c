@@ -1181,11 +1181,6 @@ void m_callback_friendmessage(Messenger *m, void (*function)(Tox *tox, uint32_t,
     m->friend_message = function;
 }
 
-void m_callback_friend_list_change(Messenger *m, void (*function)(Tox *tox, void *userdata))
-{
-    m->friend_list_change = function;
-}
-
 void m_callback_namechange(Messenger *m, void (*function)(Tox *tox, uint32_t, const uint8_t *, size_t, void *))
 {
     m->friend_namechange = function;
@@ -1284,7 +1279,7 @@ static void check_friend_connectionstatus(Messenger *m, int32_t friendnumber, in
         check_friend_tcp_udp(m, friendnumber, userdata);
 
         if (m->friend_connectionstatuschange_internal) {
-            m->friend_connectionstatuschange_internal(m->tox, friendnumber, is_online,
+            m->friend_connectionstatuschange_internal(m, friendnumber, is_online,
                     m->friend_connectionstatuschange_internal_userdata);
         }
     }
@@ -2747,7 +2742,7 @@ static int handle_packet(void *object, int f_num, int d_num, const uint8_t *temp
             }
 
             if (m->msi_packet) {
-                (*m->msi_packet)(m->tox, f_num, data, data_length, m->msi_packet_userdata);
+                (*m->msi_packet)(m, f_num, data, data_length, m->msi_packet_userdata);
             }
 
             break;
@@ -3025,7 +3020,6 @@ static uint8_t *friend_save(const struct SAVED_FRIEND *temp, uint8_t *data)
 
 static uint32_t friends_list_save(const Messenger *m, uint8_t *data)
 {
-    uint32_t num = 0;
     uint8_t *cur_data = data;
     uint32_t friend_total = 0, device_total = 0;
 
@@ -3038,38 +3032,32 @@ static uint32_t friends_list_save(const Messenger *m, uint8_t *data)
         // Reset for next friend
         memset(&cur_friend, 0, sizeof cur_friend);
 
+        unsigned device_i = 0;
         if (m->friendlist[i].status > 0) {
-            unsigned device_i = 0;
             struct SAVED_DEVICE devices[m->friendlist[i].dev_count];
 
             cur_friend.status = m->friendlist[i].status;
             if (cur_friend.status < 3) {
-                const size_t freq_msg_len = MIN(m->friendlist[i].info_size, MIN(SAVED_FRIEND_REQUEST_SIZE,
-                                                                                MAX_FRIEND_REQUEST_DATA_SIZE));
-
-                memcpy(cur_friend.info, m->friendlist[i].info, freq_msg_len);
-
-            memset(&devices, 0, sizeof(struct SAVED_DEVICE) * m->friendlist[i].dev_count);
-            for (unsigned device = 0; device < m->friendlist[i].dev_count; ++device) {
-                /* For each device in the friend list */
-                if (m->friendlist[i].dev_list[device].status) {
-                    devices[device_i].device_status = m->friendlist[i].dev_list[device].status;
-                    memcpy(devices[device_i].real_pk, m->friendlist[i].dev_list[device].real_pk, CRYPTO_PUBLIC_KEY_SIZE);
-                    ++device_i;
-                    ++device_total;
-                    ++cur_friend.dev_count;
-                }
-            }
-
-                if (m->friendlist[i].info_size > SAVED_FRIEND_REQUEST_SIZE) {
-                    memcpy(cur_friend.info, m->friendlist[i].info, SAVED_FRIEND_REQUEST_SIZE);
-                } else {
-                    memcpy(cur_friend.info, m->friendlist[i].info, m->friendlist[i].info_size);
-                }
-
+                // Unconfirmed friend
+                const size_t freq_msg_len = MIN(m->friendlist[i].info_size,
+                                                MIN(SAVED_FRIEND_REQUEST_SIZE, MAX_FRIEND_REQUEST_DATA_SIZE));
                 cur_friend.info_size = htons(m->friendlist[i].info_size);
+                memcpy(cur_friend.info, m->friendlist[i].info, freq_msg_len);
                 cur_friend.friendrequest_nospam = m->friendlist[i].friendrequest_nospam;
             } else {
+                // Copy out the devices
+                memset(&devices, 0, sizeof(struct SAVED_DEVICE) * m->friendlist[i].dev_count);
+                for (unsigned device = 0; device < m->friendlist[i].dev_count; ++device) {
+                    /* For each device in the friend list */
+                    if (m->friendlist[i].dev_list[device].status) {
+                        devices[device_i].device_status = m->friendlist[i].dev_list[device].status;
+                        memcpy(devices[device_i].real_pk, m->friendlist[i].dev_list[device].real_pk, CRYPTO_PUBLIC_KEY_SIZE);
+                        ++device_i;
+                        ++device_total;
+                        ++cur_friend.dev_count;
+                    }
+                }
+
                 memcpy(cur_friend.name, m->friendlist[i].name, m->friendlist[i].name_length);
                 cur_friend.name_length = htons(m->friendlist[i].name_length);
                 memcpy(cur_friend.statusmessage, m->friendlist[i].statusmessage, m->friendlist[i].statusmessage_length);
@@ -3081,7 +3069,6 @@ static uint32_t friends_list_save(const Messenger *m, uint8_t *data)
                 host_to_net(last_seen_time, sizeof(uint64_t));
                 memcpy(&cur_friend.last_seen_time, last_seen_time, sizeof(uint64_t));
             }
-
 
             // MDEV
             memcpy(data, &cur_friend, sizeof(struct SAVED_FRIEND));
@@ -3110,9 +3097,7 @@ static uint32_t friends_list_save(const Messenger *m, uint8_t *data)
 
     // assert(cur_data - data == num * friend_size());
     return cur_data - data;
-
 }
-
 
 
 #define VALUE_MEMBER(NAME)                          \

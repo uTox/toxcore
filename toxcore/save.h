@@ -26,23 +26,31 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* New tox format for load/save, more robust and forward compatible */
+/* New tox format for load/save, more robust and forward compatible
+ *
+ * TODO rename save -> state. so funcs can be called state_save_ and state_load_,
+ *                                                 vs save_save_ and save_load_
+ *
+ * Compiles on the same level as tox.h, but technically, is should be once layer below.
+ * Meaning lower layers should be able to include save.h without gaining any additional knowledge
+ * about what's goes on in other files. */
 
 #define SAVE_STATE_COOKIE_GLOBAL 0x15ed1b1f
 
 #define SAVE_STATE_COOKIE_TYPE      0x01ce
-#define SAVE_STATE_TYPE_NOSPAMKEYS    1
-#define SAVE_STATE_TYPE_DHT           2
-#define SAVE_STATE_TYPE_OLDFRIENDS    3    /* Deprecated by *_FRIENDS */
-#define SAVE_STATE_TYPE_NAME          4
-#define SAVE_STATE_TYPE_STATUSMESSAGE 5
-#define SAVE_STATE_TYPE_STATUS        6
-#define SAVE_STATE_TYPE_TCP_RELAY     10
-#define SAVE_STATE_TYPE_PATH_NODE     11
-#define SAVE_STATE_TYPE_FRIENDS       12
-#define SAVE_STATE_TYPE_MDEVICE       13
-#define SAVE_STATE_TYPE_END           255
-
+typedef enum {
+    SAVE_STATE_TYPE_NOSPAMKEYS      = 1,
+    SAVE_STATE_TYPE_DHT             = 2,
+    SAVE_STATE_TYPE_OLDFRIENDS      = 3,    /* Deprecated by *_FRIENDS */
+    SAVE_STATE_TYPE_NAME            = 4,
+    SAVE_STATE_TYPE_STATUSMESSAGE   = 5,
+    SAVE_STATE_TYPE_STATUS          = 6,
+    SAVE_STATE_TYPE_TCP_RELAY       = 10,
+    SAVE_STATE_TYPE_PATH_NODE       = 11,
+    SAVE_STATE_TYPE_FRIENDS         = 12,
+    SAVE_STATE_TYPE_MDEVICE         = 13,
+    SAVE_STATE_TYPE_END             = 255,
+} SAVE_STATE_TYPES;
 #define NUM_SAVED_PATH_NODES 8
 
 typedef struct Tox Tox;

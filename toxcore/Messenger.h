@@ -202,8 +202,6 @@ typedef struct {
     uint8_t     last_connection_udp_tcp;
 } F_Device;
 
-typedef struct Tox Tox;
-
 typedef struct {
     F_Device    *dev_list;
     uint64_t    dev_count;
@@ -274,8 +272,6 @@ struct Messenger {
     uint8_t has_added_relays; // If the first connection has occurred in do_messenger
     Node_format loaded_relays[NUM_SAVED_TCP_RELAYS]; // Relays loaded from config
 
-    void (*friend_list_change)(Tox *tox, void *userdata); /* TODO, does this fit better here? or in MDevice.c? */
-
     void (*friend_message)(Tox *tox, uint32_t, unsigned int, const uint8_t *, size_t, void *);
     void (*friend_namechange)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
     void (*friend_statusmessagechange)(Tox *tox, uint32_t, const uint8_t *, size_t, void *);
@@ -308,7 +304,7 @@ struct Messenger {
     Messenger_Options options;
 };
 
-/** realloc the friendlist of @m to @num
+/** realloc the friendlist of m to num
  *
  * Returns -1 on failure */
 int realloc_friendlist(Messenger *m, uint32_t num);
@@ -534,11 +530,6 @@ void m_callback_friendrequest(Messenger *m, void (*function)(Tox *tox, const uin
  */
 void m_callback_friendmessage(Messenger *m, void (*function)(Tox *tox, uint32_t, unsigned int, const uint8_t *,
                               size_t, void *));
-
-/* Set the callback for bulk friend list changes, when it's expected that the version toxcore has will no longer match
- * the version may have.
- */
-void m_callback_friend_list_change(Messenger *m, void (*function)(Tox *tox, void *userdata));
 
 /* Set the callback for name changes.
  *  Function(uint32_t friendnumber, uint8_t *newname, size_t length)

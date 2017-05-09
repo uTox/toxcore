@@ -33,7 +33,7 @@ function(apidsl)
       set(out_file ${CMAKE_SOURCE_DIR}/${dirname}/${filename}.h)
 
       # Run apidsl.
-      add_custom_command(
+      add_custom_target(
         OUTPUT ${out_file}
         COMMAND "${APIDSL}" "${CMAKE_SOURCE_DIR}/${in_file}"
           | "${ASTYLE}" --options="${CMAKE_SOURCE_DIR}/other/astyle/astylerc"

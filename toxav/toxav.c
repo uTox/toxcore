@@ -212,6 +212,7 @@ uint32_t toxav_iteration_interval(const ToxAV *av)
 }
 void toxav_iterate(ToxAV *av)
 {
+    return;
     pthread_mutex_lock(av->mutex);
 
     if (av->calls == NULL) {

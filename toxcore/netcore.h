@@ -30,5 +30,7 @@ typedef struct Netcore {
 
 Netcore *netcore_init(Tox *tox);
 
+void netcore_raze(Netcore *n);
+
 
 #endif // TOX_NETCORE

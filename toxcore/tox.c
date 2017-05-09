@@ -203,7 +203,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     }
 
     if (tox->ncore->net == NULL) {
-        free(tox->ncore);
+        netcore_raze(tox->ncore);
         free(tox);
 
         if (error && net_err == 1) {
@@ -219,7 +219,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
 
     if (tox->ncore->dht == NULL) {
         kill_networking(tox->ncore->net);
-        free(tox->ncore);
+        netcore_raze(tox->ncore);
         free(tox);
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
@@ -230,7 +230,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     if (tox->ncore->net_crypto == NULL) {
         kill_networking(tox->ncore->net);
         kill_DHT(tox->ncore->dht);
-        free(tox->ncore);
+        netcore_raze(tox->ncore);
         free(tox);
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
@@ -247,7 +247,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         kill_net_crypto(tox->ncore->net_crypto);
         kill_DHT(tox->ncore->dht);
         kill_networking(tox->ncore->net);
-        free(tox->ncore);
+        netcore_raze(tox->ncore);
         free(tox);
         SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         return NULL;
@@ -270,6 +270,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
     mdev->tox = tox;
+    mdev->m   = m;
     tox->mdev = mdev;
 
     tox->gc = new_groupchats(tox->m);

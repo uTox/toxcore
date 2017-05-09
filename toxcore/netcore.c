@@ -23,3 +23,10 @@ Netcore *netcore_init(Tox *tox)
 
     return ncore;
 }
+
+void netcore_raze(Netcore *n)
+{
+    if (n) {
+        free(n);
+    }
+}

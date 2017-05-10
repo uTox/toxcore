@@ -308,7 +308,7 @@ static bool init_sync_devices(MDevice *mdev, uint32_t dev_num)
         return -1;
     }
 
-    uint8_t packet[ (sizeof(uint8_t) * 2) + sizeof(mdev->devices_count)];
+    uint8_t packet[(sizeof(uint8_t) * 2) + sizeof(mdev->devices_count)];
 
     packet[0] = PACKET_ID_MDEV_SYNC;
     packet[1] = MDEV_SYNC_DEVICE_COUNT;
@@ -632,7 +632,7 @@ static int handle_status(void *object, int dev_num, int device_id, uint8_t statu
 {
     MDevice *mdev = object;
 
-    if (dev_num < 0 || dev_num > UINT32_MAX || (uint32_t)dev_num >= mdev->devices_count) {
+    if (dev_num < 0 || (uint32_t)dev_num > UINT32_MAX || (uint32_t)dev_num >= mdev->devices_count) {
         return -1;
     }
 

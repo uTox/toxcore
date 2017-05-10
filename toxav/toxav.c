@@ -535,7 +535,7 @@ bool toxav_bit_rate_set(ToxAV *av, uint32_t friend_number, int32_t audio_bit_rat
     TOXAV_ERR_BIT_RATE_SET rc = TOXAV_ERR_BIT_RATE_SET_OK;
     ToxAVCall *call;
 
-    if (m_friend_exists(av->m->tox, friend_number) == 0) {
+    if (m_friend_exists(av->m, friend_number) == 0) {
         rc = TOXAV_ERR_BIT_RATE_SET_FRIEND_NOT_FOUND;
         goto END;
     }

@@ -29,6 +29,7 @@
 #include "tox.h"
 
 #include "Messenger.h"
+#include "ToxModule.h"
 #include "MDevice.h"
 #include "group.h"
 #include "logger.h"
@@ -77,6 +78,39 @@ bool tox_version_is_compatible(uint32_t major, uint32_t minor, uint32_t patch)
     return TOX_VERSION_IS_API_COMPATIBLE(major, minor, patch);
 }
 
+static bool module_init(Tox *tox)
+{
+    // TODO can leak if list != null
+    tox->module_list = calloc(sizeof(ToxModule), 1);
+    if (tox->module_list) {
+        tox->module_count = 0;
+        return true;
+    }
+    return false;
+}
+
+static int module_add(Tox *tox, void *mod_data,
+                      void (*iterate)(void *mod_data, void *userdata),
+                      void (*raze)(void *mod_data))
+{
+    if (!tox->module_list) {
+        if (!module_init(tox)) {
+            return -1;
+        }
+    } else {
+        ToxModule *next = realloc(tox->module_list, sizeof(ToxModule) * tox->module_count + 1);
+        if (!next) {
+            return -2;
+        }
+        tox->module_list = next;
+        memset(&tox->module_list[tox->module_count], 0, sizeof(ToxModule));
+    }
+
+    tox->module_list[tox->module_count].mod_data = mod_data;
+    tox->module_list[tox->module_count].mod_iterate = iterate;
+    tox->module_list[tox->module_count].mod_raze = raze;
+    return tox->module_count++;
+}
 
 Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
 {
@@ -193,6 +227,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
 
     unsigned int net_err = 0;
 
+    // TODO netcore should handle networking, not tox_new()
     if (m_options.udp_disabled) {
         /* this is the easiest way to completely disable UDP without changing too much code. */
         tox->ncore->net = calloc(1, sizeof(Networking_Core));
@@ -236,6 +271,7 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
+    // TODO remove onion
     tox->ncore->onion    = new_onion(tox->ncore->dht);
     tox->ncore->onion_a  = new_onion_announce(tox->ncore->dht);
     tox->ncore->onion_c  = new_onion_client(tox->ncore->net_crypto);
@@ -253,30 +289,17 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
         return NULL;
     }
 
-    unsigned int m_error;
 
-    tox->ncore->tox_conn = new_tox_conns(tox->ncore->onion_c);
+    tox->ncore->tox_conn = toxconn_new(tox->ncore->onion_c);
 
-    Messenger *m = messenger_new(log, tox->ncore, &m_options, &m_error);
-    if (!m) {
-        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
-        return NULL;
-    }
-    tox->m = m;
+    if (options->enable_messenger) {
+        unsigned int m_error;
+        Messenger *m = messenger_new(log, tox->ncore, &m_options, &m_error);
+        if (!m) {
+            SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
+            return NULL;
+        }
 
-    MDevice *mdev = mdevice_new(tox, tox->ncore, &mdev_options, &m_error);
-    if (!mdev) {
-        SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
-        return NULL;
-    }
-    mdev->tox = tox;
-    mdev->m   = m;
-    tox->mdev = mdev;
-
-    tox->gc = new_groupchats(tox->m);
-    if (!tox->gc) {
-        kill_messenger(m); /* TODO messenger doesn't do everything anymore so we need to kill everything here instead */
-                           /* OTHER TODO we need to make groupchats optional*/
         if (m_error == MESSENGER_ERROR_PORT) {
             SET_ERROR_PARAMETER(error, TOX_ERR_NEW_PORT_ALLOC);
         } else if (m_error == MESSENGER_ERROR_TCP_SERVER) {
@@ -285,7 +308,47 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
             SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
         }
 
+        if (module_add(tox, m, &do_messenger, &kill_messenger) < 0 ) {
+            // TODO set error here
+            // TODO clean up
+            return NULL;
+        }
+        // FIXME temp hack while Messenger api is in tox.c
+        tox->m = m;
+
+        if (options->enable_groupchats) {
+            Group_Chats *gc = new_groupchats(m);
+
+            if (module_add(tox, gc, &do_groupchats, &kill_groupchats)) {
+                kill_messenger(m); /* TODO messenger doesn't do everything anymore so we need to kill everything here instead */
+                                   /* OTHER TODO we need to make groupchats optional*/
+                return NULL;
+            }
+            // FIXME temp hack while Messenger api is in tox.c
+            tox->gc = gc;
+        }
+
+
         return NULL;
+    }
+
+    if (options->enable_mdevice) {
+        MDevice *mdev = mdevice_new(tox, tox->ncore, &mdev_options, NULL); // TODO error check init
+        if (!mdev) {
+            SET_ERROR_PARAMETER(error, TOX_ERR_NEW_MALLOC);
+            return NULL;
+        }
+
+        if (module_add(tox, mdev, &do_multidevice, NULL)) {
+            // TODO set error here
+            // TODO clean up
+            return NULL;
+        }
+        mdev->tox = tox;
+        // FIXME temp hack while MDevice api is in tox.c
+        tox->mdev = mdev;
+
+        // mdev->m   = m;
     }
 
     if (load_savedata_tox && save_load_from_data(tox, options->savedata_data, options->savedata_length) == -1) {
@@ -302,14 +365,22 @@ Tox *tox_new(const struct Tox_Options *options, TOX_ERR_NEW *error)
     return tox;
 }
 
+static void module_raze_all(Tox *tox)
+{
+    while(tox->module_count--) {
+        if (tox->module_list[tox->module_count].mod_raze) {
+            tox->module_list[tox->module_count].mod_raze(tox->module_list[tox->module_count].mod_data);
+        }
+    }
+}
+
 void tox_kill(Tox *tox)
 {
     if (tox == NULL) {
         return;
     }
 
-    kill_groupchats(tox->gc);
-    kill_messenger(tox->m);
+    module_raze_all(tox);
 }
 
 size_t tox_get_savedata_size(const Tox *tox)
@@ -462,14 +533,20 @@ uint32_t tox_iteration_interval(const Tox *tox)
     return messenger_run_interval(tox->m);
 }
 
+static void  module_iterate_all(Tox *tox, void *userdata)
+{
+    for (uint32_t i = 0; i < tox->module_count; ++i) {
+        if (tox->module_list[i].mod_iterate) {
+            tox->module_list[i].mod_iterate(tox->module_list[i].mod_data, userdata);
+        }
+    }
+}
+
 void tox_iterate(Tox *tox, void *userdata)
 {
-    do_messenger(tox->m, userdata);
-    do_groupchats(tox->gc, userdata);
+    module_iterate_all(tox, userdata);
 
     do_tox_connections(tox->ncore->tox_conn, userdata);
-    do_multidevice(tox->mdev);
-
 }
 
 void tox_self_get_address(const Tox *tox, uint8_t *address)

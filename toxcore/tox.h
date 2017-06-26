@@ -492,10 +492,9 @@ typedef void tox_log_cb(Tox *tox, TOX_LOG_LEVEL level, const char *file, uint32_
  */
 struct Tox_Options {
     bool enable_messenger;
-
     bool enable_mdevice;
-
     bool enable_groupchats;
+    bool enable_toxav;
 
     /**
      * Send a copy of every message to a friend, to all connected devices.
@@ -763,19 +762,22 @@ typedef struct MDevice      MDevice;
 typedef struct Group_Chats  Group_Chats;
 typedef struct ToxAV        ToxAV;
 
-typedef struct Logger       Logger;
+typedef struct Logger    Logger;
+typedef struct Netcore   Netcore;
 
-typedef struct Netcore      Netcore;
+typedef struct ToxModule ToxModule;
 
 struct Tox {
-    Messenger   *m;
-    MDevice     *mdev;
+    Logger     *log;
+    Netcore    *ncore;
+    uint32_t    module_count;
+    ToxModule  *module_list;
+
+    // FIXME Temp hack until the messenger API is removed from toxcore
+    Messenger *m;
+    MDevice *mdev;
     Group_Chats *gc;
-    ToxAV       *av;
-
-    Logger      *log;
-
-    Netcore     *ncore;
+    ToxAV *av;
 };
 
 

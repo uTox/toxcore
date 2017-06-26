@@ -262,7 +262,7 @@ static int tcp_relay_node_callback(void *object, uint32_t number, IP_Port ip_por
     }
 }
 
-static int toxconn_new_connection(Tox_Connections *tox_conns, int toxconn_id);
+static int new_connection(Tox_Connections *tox_conns, int toxconn_id);
 /* Callback for DHT ip_port changes. */
 static void dht_ip_callback(void *object, int32_t number, IP_Port ip_port)
 {
@@ -273,7 +273,7 @@ static void dht_ip_callback(void *object, int32_t number, IP_Port ip_port)
         return;
 
     if (tox_con->crypt_connection_id == -1) {
-        toxconn_new_connection(tox_conns, number);
+        new_connection(tox_conns, number);
     }
 
     set_direct_ip_port(tox_conns->net_crypto, tox_con->crypt_connection_id, ip_port, 1);
@@ -372,7 +372,7 @@ static void dht_pk_callback(void *object, int32_t number, const uint8_t *dht_pub
         handle_status(object, number, 0, userdata); /* Going offline. */
     }
 
-    toxconn_new_connection(tox_conns, number);
+    new_connection(tox_conns, number);
     onion_set_friend_DHT_pubkey(tox_conns->onion_c, tox_con->onion_friendnum, dht_public_key);
 }
 
@@ -463,24 +463,25 @@ static int handle_lossy_packet(void *object, int number, const uint8_t *data, ui
 static int handle_new_connections(void *object, New_Connection *n_c)
 {
     Tox_Connections *tox_conns = object;
-    int toxconn_id = toxconn_get_id_from_pk(tox_conns, n_c->public_key);
-    Tox_Conn *tox_con = get_conn(tox_conns, toxconn_id);
+
+    int tc_id = toxconn_get_id_from_pk(tox_conns, n_c->public_key);
+    Tox_Conn *tox_con = get_conn(tox_conns, tc_id);
 
     if (tox_con) {
-
-        if (tox_con->crypt_connection_id != -1)
-            return -1;
-
-        int id = accept_crypto_connection(tox_conns->net_crypto, n_c);
-
-        if (id == -1) {
+        if (tox_con->crypt_connection_id != -1) {
             return -1;
         }
 
-        connection_status_handler(tox_conns->net_crypto, id, &handle_status, tox_conns, toxconn_id);
-        connection_data_handler(tox_conns->net_crypto, id, &handle_packet, tox_conns, toxconn_id);
-        connection_lossy_data_handler(tox_conns->net_crypto, id, &handle_lossy_packet, tox_conns, toxconn_id);
-        tox_con->crypt_connection_id = id;
+        int netcrypto_id = accept_crypto_connection(tox_conns->net_crypto, n_c);
+
+        if (netcrypto_id == -1) {
+            return -1;
+        }
+
+        connection_status_handler(tox_conns->net_crypto, netcrypto_id, &handle_status, tox_conns, tc_id);
+        connection_data_handler(tox_conns->net_crypto, netcrypto_id, &handle_packet, tox_conns, tc_id);
+        connection_lossy_data_handler(tox_conns->net_crypto, netcrypto_id, &handle_lossy_packet, tox_conns, tc_id);
+        tox_con->crypt_connection_id = netcrypto_id;
 
         if (n_c->source.ip.family != AF_INET && n_c->source.ip.family != AF_INET6) {
             set_direct_ip_port(tox_conns->net_crypto, tox_con->crypt_connection_id, tox_con->dht_ip_port, 0);
@@ -490,22 +491,23 @@ static int handle_new_connections(void *object, New_Connection *n_c)
         }
 
         if (public_key_cmp(tox_con->dht_temp_pk, n_c->dht_public_key) != 0) {
-            change_dht_pk(tox_conns, toxconn_id, n_c->dht_public_key);
+            change_dht_pk(tox_conns, tc_id, n_c->dht_public_key);
         }
 
-        nc_dht_pk_callback(tox_conns->net_crypto, id, &dht_pk_callback, tox_conns, toxconn_id);
+        nc_dht_pk_callback(tox_conns->net_crypto, netcrypto_id, &dht_pk_callback, tox_conns, tc_id);
         return 0;
     }
 
     return -1;
 }
 
-static int toxconn_new_connection(Tox_Connections *tox_conns, int toxconn_id)
+static int new_connection(Tox_Connections *tox_conns, int toxconn_id)
 {
     Tox_Conn *tox_con = get_conn(tox_conns, toxconn_id);
 
-    if (!tox_con)
+    if (!tox_con) {
         return -1;
+    }
 
     if (tox_con->crypt_connection_id != -1) {
         return -1;
@@ -518,8 +520,9 @@ static int toxconn_new_connection(Tox_Connections *tox_conns, int toxconn_id)
 
     int id = new_crypto_connection(tox_conns->net_crypto, tox_con->real_public_key, tox_con->dht_temp_pk);
 
-    if (id == -1)
+    if (id == -1) {
         return -1;
+    }
 
     tox_con->crypt_connection_id = id;
     connection_status_handler(tox_conns->net_crypto, id, &handle_status, tox_conns, toxconn_id);
@@ -664,7 +667,7 @@ int toxconn_crypt_connection_id(Tox_Connections *tox_conns, int toxconn_id)
  * return -1 on failure.
  * return connection id on success.
  */
-int new_tox_conn(Tox_Connections *tox_conns, const uint8_t *real_public_key)
+int toxconn_new_connection_legacy(Tox_Connections *tox_conns, const uint8_t *real_public_key)
 {
     int toxconn_id = toxconn_get_id_from_pk(tox_conns, real_public_key);
 
@@ -773,7 +776,7 @@ int send_friend_request_pkt(Tox_Connections *tox_conns, int toxconn_id, uint32_t
 }
 
 /* Create new Tox_Connections instance. */
-Tox_Connections *new_tox_conns(Onion_Client *onion_c)
+Tox_Connections *toxconn_new(Onion_Client *onion_c)
 {
     if (!onion_c)
         return NULL;
@@ -825,7 +828,7 @@ void do_tox_connections(Tox_Connections *tox_conns, void *userdata)
                 }
 
                 if (tox_con->dht_lock) {
-                    if (toxconn_new_connection(tox_conns, i) == 0) {
+                    if (new_connection(tox_conns, i) == 0) {
                         set_direct_ip_port(tox_conns->net_crypto, tox_con->crypt_connection_id, tox_con->dht_ip_port, 0);
                         connect_to_saved_tcp_relays(tox_conns, i, (MAX_TCP_CONNECTIONS / 2)); /* Only fill it half up. */
                     }

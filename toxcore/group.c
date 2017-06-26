@@ -379,7 +379,7 @@ static int connect_to_closest(Group_Chats *g_c, int groupnumber, void *userdata)
         uint8_t lock = 1;
 
         if (friendcon_id == -1) {
-            friendcon_id = new_tox_conn(g_c->ncore->tox_conn, g->closest_peers[i].real_pk);
+            friendcon_id = toxconn_new_connection_legacy(g_c->ncore->tox_conn, g->closest_peers[i].real_pk);
             lock = 0;
 
             if (friendcon_id == -1) {

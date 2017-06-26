@@ -266,7 +266,7 @@ static int32_t init_new_friend(Messenger *m, const uint8_t *real_pk, uint8_t sta
     memset(&(m->friendlist[m->numfriends]), 0, sizeof(Friend));
 
 
-    int friendcon_id = new_tox_conn(m->ncore->tox_conn, real_pk);
+    int friendcon_id = toxconn_new_connection_legacy(m->ncore->tox_conn, real_pk);
 
     if (friendcon_id == -1) {
         return FAERR_NOMEM;
@@ -324,7 +324,7 @@ static int32_t init_new_device_friend(Messenger *m, uint32_t friend_number, cons
 
     memset(&(friend->dev_list[dev_count]), 0, sizeof(F_Device));
 
-    int friendcon_id = new_tox_conn(m->ncore->tox_conn, real_pk);
+    int friendcon_id = toxconn_new_connection_legacy(m->ncore->tox_conn, real_pk);
 
     if (friendcon_id == -1) {
         return FAERR_NOMEM;
@@ -3175,10 +3175,12 @@ static int oldfriends_list_load(Messenger *m, const uint8_t *data, uint32_t leng
 /*  return size of the messenger data (for saving) */
 uint32_t messenger_size(const Messenger *m)
 {
-    uint32_t size32 = sizeof(uint32_t), sizesubhead = size32 * 2;
-    return   size32 * 2                                      // global cookie
+    uint32_t size32 = sizeof(uint32_t);
+    uint32_t sizesubhead = size32 * 2;
+
+    return     size32 * 2                                      // global cookie
              + sizesubhead + sizeof(uint32_t) + CRYPTO_PUBLIC_KEY_SIZE + CRYPTO_SECRET_KEY_SIZE
-             + sizesubhead + DHT_size(m->ncore->dht)         // DHT
+             + sizesubhead + DHT_size(m->ncore->dht)           // DHT
              + sizesubhead + saved_friendslist_size(m)         // Friendlist itself.
              + sizesubhead + m->name_length                    // Own nickname.
              + sizesubhead + m->statusmessage_length           // status message

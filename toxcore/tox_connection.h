@@ -180,7 +180,15 @@ int toxconn_crypt_connection_id(Tox_Connections *tox_conns, int toxconn_id);
  * return -1 on failure.
  * return connection id on success.
  */
-int new_tox_conn(Tox_Connections *tox_conns, const uint8_t *real_public_key);
+int toxconn_new_connection(Tox_Connections *tox_conns, const uint8_t *real_public_key, const uint8_t *magic_key);
+
+/* Create a legacy style tox connection to pubkey.
+ * If one to that real public key already exists, increase lock count and return it.
+ *
+ * return -1 on failure.
+ * return connection id on success.
+ */
+int toxconn_new_connection_legacy(Tox_Connections *tox_conns, const uint8_t *real_public_key);
 
 /* Kill a tox connection.
  *
@@ -201,12 +209,12 @@ int send_friend_request_pkt(Tox_Connections *tox_conns, int toxconn_id, uint32_t
  *
  * This function will be called every time a connection request is received.
  */
-void set_tox_conn_request_callback(Tox_Connections *tox_conns,
+void toxconn_set_request_callback(Tox_Connections *tox_conns,
                                    int (*friend_request_callback)(void *, const uint8_t *,const uint8_t *, uint16_t, void *userdata),
                                    void *object);
 
 /* Create new tox_connections instance. */
-Tox_Connections *new_tox_conns(Onion_Client *onion_c);
+Tox_Connections *toxconn_new(Onion_Client *onion_c);
 
 /* main tox_connections loop. */
 void do_tox_connections(Tox_Connections *tox_conns, void *userdata);

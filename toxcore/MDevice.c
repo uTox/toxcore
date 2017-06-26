@@ -214,7 +214,7 @@ static int32_t init_new_device_self(MDevice *mdev, const uint8_t* name, size_t l
 
     memset(device, 0, sizeof(Device));
 
-    int devconn_id = new_tox_conn(mdev->ncore->tox_conn, real_pk);
+    int devconn_id = toxconn_new_connection_legacy(mdev->ncore->tox_conn, real_pk);
 
     if (devconn_id == -1) {
         return FAERR_NOMEM;

@@ -942,8 +942,9 @@ static int handle_packet(void *object, int dev_num, int device_id, const uint8_t
 
     MDevice *mdev = object;
 
-    if (dev_num < 0 || dev_num > UINT32_MAX || (uint32_t)dev_num >= mdev->devices_count)
+    if (dev_num < 0 || dev_num > UINT32_MAX || (uint32_t)dev_num >= mdev->devices_count) {
         return -1;
+    }
 
     uint8_t packet_id = pkt[0];
     uint8_t *data = pkt + 1;
@@ -1181,12 +1182,11 @@ void multidevice_raze(MDevice *dev)
     free(dev);
 }
 
-void do_multidevice(MDevice *mdev)
+void do_multidevice(MDevice *mdev, void *userdata)
 {
     if (!mdev || !mdev->tox) {
         return;
     }
-
 
     /* we should probably do things here... */
 }

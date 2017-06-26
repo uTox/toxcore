@@ -215,7 +215,7 @@ typedef struct Tox Tox;
  *
  * @param tox the current tox instance
  */
-void do_multidevice(MDevice *mdev);
+void do_multidevice(MDevice *mdev, void *userdata);
 
 /**
  * Creates a new MDevice instance
